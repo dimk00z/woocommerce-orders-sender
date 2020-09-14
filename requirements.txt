@@ -11,9 +11,11 @@ lxml==4.5.2
 ordereddict==1.1
 premailer==3.7.0
 pycodestyle==2.6.0
+pyTelegramBotAPI==3.7.3
 python-dotenv==0.14.0
-requests==2.24.0
+requests==2.7.0
 rfc3986==1.4.0
+six==1.15.0
 sniffio==1.1.0
 toml==0.10.1
 urllib3==1.25.10

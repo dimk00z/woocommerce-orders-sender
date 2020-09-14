@@ -31,5 +31,7 @@ def load_params():
         'wc_url': os.getenv("WC_URL"),
         'email_sender': os.getenv("EMAIL_SENDER"),
         'email_password': os.getenv("EMAIL_PASSWORD"),
+        'email_display_name': os.getenv("EMAIL_DISPLAY_NAME"),
+        
     }
     return params
