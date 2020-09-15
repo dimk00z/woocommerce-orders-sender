@@ -1,7 +1,8 @@
 import requests
 import logging
 import telebot
-from utils import HEADERS, TEMPLATE_MESSAGE, load_params, send_email
+from utils import HEADERS, TEMPLATE_MESSAGE, TOUGH_EMAIL_SERVERS,\
+    load_params, send_email
 
 from pprint import pprint
 
@@ -54,8 +55,18 @@ def send_order_email(order, params):
     contents = [
         email_message
     ]
+    is_zip_file = False
     for file_name in order['files']:
         contents.append(file_name)
+        if file_name.contains('.zip'):
+            is_zip_file = True
+    is_tough_email = False
+    if is_zip_file:
+        for tough_email in TOUGH_EMAIL_SERVERS:
+            if order['email'].cointains(tough_email):
+                is_tough_email = True
+    if is_zip_file and is_tough_email:
+        return False
     subject = f"Заказ №{order['id']}"
     return send_email(params, order['email'], subject, contents)
 
