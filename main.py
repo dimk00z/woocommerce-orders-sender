@@ -1,10 +1,8 @@
 import requests
-import yagmail
-import smtplib
 import logging
 import telebot
-from utils import HEADERS, TEMPLATE_MESSAGE, load_params
-from yagmail.error import YagInvalidEmailAddress, YagConnectionClosed, YagAddressError
+from utils import HEADERS, TEMPLATE_MESSAGE, load_params, send_email
+
 from pprint import pprint
 
 
@@ -29,10 +27,6 @@ def fetch_wc_processing_orders(url, auth_pair):
         orders = []
         for order_info in wc_processing_orders:
 
-            # debug!
-            # if order_info['billing']['email'] != 'dimk0z@yandex.ru':
-            #     continue
-
             order = {
                 'id': order_info['id'],
                 'total': order_info['total'],
@@ -52,28 +46,18 @@ def fetch_wc_processing_orders(url, auth_pair):
         return(orders)
 
 
-def send_email(order, email_user, email_password, email_display_name):
-    user_info = {'first_name': order['first_name'],
-                 'last_name': order['last_name'],
-                 'id': order['id']}
-    email_message = TEMPLATE_MESSAGE.format(**user_info)
-    try:
-        yag = yagmail.SMTP(user={email_user: email_display_name},
-                           password=email_password,
-                           smtp_ssl=True,
-                           host='smtp.yandex.ru', port=465)
-        contents = [
-            email_message
-        ]
-        for file_name in order['files']:
-            contents.append(file_name)
-        subject = f"Заказ №{order['id']}"
-        yag.send(to=order['email'], subject=subject, contents=contents)
-        return True
-    except (YagInvalidEmailAddress, YagConnectionClosed, smtplib.SMTPAuthenticationError,
-            YagAddressError, smtplib.SMTPDataError, smtplib.SMTPServerDisconnected) as ex:
-        print(ex)
-        return False
+def send_order_email(order, params):
+    order_info = {'first_name': order['first_name'],
+                  'last_name': order['last_name'],
+                  'id': order['id']}
+    email_message = TEMPLATE_MESSAGE.format(**order_info)
+    contents = [
+        email_message
+    ]
+    for file_name in order['files']:
+        contents.append(file_name)
+    subject = f"Заказ №{order['id']}"
+    return send_email(params, order['email'], subject, contents)
 
 
 def change_order_status(auth_pair, url, order):
@@ -113,8 +97,8 @@ def send_result_to_telegram(orders, telegram_bot_token, telegram_users):
 
 def do_orders(orders, auth_pair, url, params):
     for order_number, order in enumerate(orders):
-        send_result = send_email(
-            order, params['email_sender'], params["email_password"], params["email_display_name"])
+        send_result = send_order_email(
+            order, params)
         orders[order_number]['send_result'] = send_result
         if send_result:
             orders[order_number]['status'] = change_order_status(
@@ -134,6 +118,7 @@ def main():
             orders,
             params['telegram_bot_token'],
             params['telegram_users'])
+    # send_email(params, 'dimk00z@gmail.com', 'test email', 'test')
 
 
 if __name__ == "__main__":
