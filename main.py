@@ -58,12 +58,12 @@ def send_order_email(order, params):
     is_zip_file = False
     for file_name in order['files']:
         contents.append(file_name)
-        if file_name.contains('.zip'):
+        if '.zip' in file_name:
             is_zip_file = True
     is_tough_email = False
     if is_zip_file:
         for tough_email in TOUGH_EMAIL_SERVERS:
-            if order['email'].cointains(tough_email):
+            if tough_email in order['email']:
                 is_tough_email = True
     if is_zip_file and is_tough_email:
         return False
