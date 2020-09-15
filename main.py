@@ -55,18 +55,9 @@ def send_order_email(order, params):
     contents = [
         email_message
     ]
-    is_zip_file = False
     for file_name in order['files']:
         contents.append(file_name)
-        if '.zip' in file_name:
-            is_zip_file = True
-    is_tough_email = False
-    if is_zip_file:
-        for tough_email in TOUGH_EMAIL_SERVERS:
-            if tough_email in order['email']:
-                is_tough_email = True
-    if is_zip_file and is_tough_email:
-        return False
+
     subject = f"Заказ №{order['id']}"
     return send_email(params, order['email'], subject, contents)
 
@@ -92,15 +83,22 @@ def send_result_to_telegram(orders, telegram_bot_token, telegram_users):
     total = 0
     bad_orders = []
     ids_orders = [order['id'] for order in orders]
+    tough_emails = []
     for order in orders:
-        total += float(order['total'])
         if order['status'] == False:
             bad_orders.append(order)
+            continue
+        total += float(order['total'])
+        for tough_email in TOUGH_EMAIL_SERVERS:
+            if tough_email in order['email']:
+                tough_emails.append(f'{order["id"]} - {order["email"]}')
+
     message = f"Обработано {len(orders)} заказов на {total} руб."
     message = f'{message}\n {ids_orders.__repr__()}'
     if bad_orders:
         message = f'{message}\nОшибки: {ids_orders.__repr__()}'
-
+    if tough_emails:
+        message = f'{message}\nПроверить следующие заказы: {tough_emails.__repr__()}'
     bot = telebot.TeleBot(telegram_bot_token)
     for user in telegram_users:
         bot.send_message(user, message)
