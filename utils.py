@@ -62,3 +62,6 @@ def send_email(params, to_email, subject, contents):
             YagAddressError, smtplib.SMTPDataError, smtplib.SMTPServerDisconnected) as ex:
         print(ex)
         return False
+
+
+params = load_params()

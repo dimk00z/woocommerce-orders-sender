@@ -2,9 +2,8 @@ import requests
 import logging
 import telebot
 from utils import HEADERS, TEMPLATE_MESSAGE, TOUGH_EMAIL_SERVERS,\
-    load_params, send_email
-
-from pprint import pprint
+    params, send_email
+from logger import app_logger
 
 
 def fetch_wc_url(auth_pair, url, params={}):
@@ -16,6 +15,7 @@ def fetch_wc_url(auth_pair, url, params={}):
         return r.json()
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as error:
         print("Connection error:", error)
+        app_logger.exception('Something bad:')
 
 
 def fetch_wc_processing_orders(url, auth_pair):
@@ -75,6 +75,7 @@ def change_order_status(auth_pair, url, order):
             return False
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as error:
         print("Connection error:", error)
+        app_logger.exception('Something bad:')
         return False
 
 
@@ -116,18 +117,18 @@ def do_orders(orders, auth_pair, url, params):
 
 
 def main():
-    # logging.basicConfig(level=logging.DEBUG)
-    params = load_params()
-    auth_pair = (params['wc_user_key'], params['wc_secret_key'])
-    url = f'{params["wc_url"]}/wp-json/wc/v3'
-    orders = fetch_wc_processing_orders(url, auth_pair)
-    if orders:
-        orders = do_orders(orders, auth_pair, url, params)
-        send_result_to_telegram(
-            orders,
-            params['telegram_bot_token'],
-            params['telegram_users'])
-    # send_email(params, 'dimk00z@gmail.com', 'test email', 'test')
+    try:
+        auth_pair = (params['wc_user_key'], params['wc_secret_key'])
+        url = f'{params["wc_url"]}/wp-json/wc/v3'
+        orders = fetch_wc_processing_orders(url, auth_pair)
+        if orders:
+            orders = do_orders(orders, auth_pair, url, params)
+            send_result_to_telegram(
+                orders,
+                params['telegram_bot_token'],
+                params['telegram_users'])
+    except:
+        app_logger.exception('Everything is bad:')
 
 
 if __name__ == "__main__":
