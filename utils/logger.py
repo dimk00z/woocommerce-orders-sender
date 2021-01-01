@@ -1,6 +1,6 @@
 import logging.config
 import telebot
-from utils import params
+from utils.env import load_params
 
 
 class Telegram_Handler(logging.Handler):
@@ -13,10 +13,13 @@ class Telegram_Handler(logging.Handler):
         message = self.format(record)
         bot = telebot.TeleBot(self.telegram_bot_token)
         for user in self.telegram_users:
-            bot.send_message(user, message)
+            if user:
+                bot.send_message(user, message)
 
 
 format_string = '{asctime} - {levelname} - {name} - {module}:{funcName}:{lineno}- {message}'
+telegram_params = load_params(['TELEGRAM_BOT_TOKEN',
+                               'TELEGRAM_USERS_ID', ])
 logger_config = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -30,8 +33,8 @@ logger_config = {
         'telegram_handler': {
             '()': Telegram_Handler,
             'formatter': 'std_formatter',
-            'telegram_bot_token': params['telegram_bot_token'],
-            'telegram_users': params['telegram_users']
+            'telegram_bot_token': telegram_params['telegram_bot_token'],
+            'telegram_users': telegram_params['telegram_users_id']
         },
     },
     'loggers': {
@@ -42,7 +45,3 @@ logger_config = {
         }
     },
 }
-
-
-logging.config.dictConfig(logger_config)
-app_logger = logging.getLogger('app_logger')
