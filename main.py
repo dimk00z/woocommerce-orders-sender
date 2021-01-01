@@ -20,17 +20,6 @@ def fetch_wc_url(auth_pair, url, params={}):
         app_logger.exception('Something bad:')
 
 
-def fetch_product(product_id, url, auth_pair):
-    product_url = f'{url}/products/{str(product_id)}'
-    product_info = fetch_wc_url(auth_pair, product_url)
-    return {
-        'id': product_id,
-        'product_name': product_info['name'],
-        'purchase_note': product_info['purchase_note'],
-        'self_link': product_info['_links']['self']
-    }
-
-
 def fetch_wc_processing_orders(url, auth_pair):
     orders_url = f'{url}/orders'
     params = {
