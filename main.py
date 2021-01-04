@@ -1,6 +1,7 @@
 import requests
 import telebot
 import logging.config
+from jinja2 import Template
 # from pprint import pprint
 from utils.env import load_params
 from utils.logger import logger_config
@@ -60,7 +61,10 @@ def send_order(order, webinar_string, params):
                   'last_name': order['last_name'],
                   'id': order['id'],
                   'webinar_string': webinar_string}
-    email_message = TEMPLATE_MESSAGE.format(**order_info)
+    html = open('email_template.html').read()
+    template = Template(html)
+    email_message = template.render(**order_info)
+    # email_message = TEMPLATE_MESSAGE.format(**order_info)
     contents = [
         email_message
     ]
