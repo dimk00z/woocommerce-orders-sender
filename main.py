@@ -65,7 +65,12 @@ def send_order(order, webinar_string, params):
                   'last_name': order['last_name'],
                   'id': order['id'],
                   'webinar_string': webinar_string}
-    email_message = TEMPLATE_MESSAGE.format_map(SafeDict(**order_info))
+    email_message = TEMPLATE_MESSAGE.format_map(SafeDict(
+        first_name=order_info['first_name'],
+        last_name=order_info['last_name'],
+        id=order_info['id'],
+        webinar_string=order_info['webinar_string']
+    ))
     contents = [
         email_message
     ]
