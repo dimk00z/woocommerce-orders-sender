@@ -55,17 +55,12 @@ def fetch_wc_processing_orders(url, auth_pair):
         return(orders)
 
 
-class SafeDict(dict):
-    def __missing__(self, key):
-        return '{' + key + '}'
-
-
 def send_order(order, webinar_string, params):
     order_info = {'first_name': order['first_name'],
                   'last_name': order['last_name'],
                   'id': order['id'],
                   'webinar_string': webinar_string}
-    email_message = TEMPLATE_MESSAGE.format_map(SafeDict(**order_info))
+    email_message = TEMPLATE_MESSAGE.format(**order_info)
     contents = [
         email_message
     ]
