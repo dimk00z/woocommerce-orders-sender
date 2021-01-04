@@ -125,7 +125,7 @@ def do_orders(orders, auth_pair, url, params):
         webinar_strings = []
         for product_id, product_info in order['products'].items():
             if str(product_id) in params['webinars']:
-                product_string = f'<p>Все материалы к продукту <b>{product_info["name"]}</b> доступны в закрытом чате: </p>{product_info["purchase_note"]}'
+                product_string = f'<p><b>{product_info["name"]}</b> доступен в закрытом чате.</p>{product_info["purchase_note"]}'
                 webinar_strings.append(product_string)
         if webinar_strings:
             webinar_string = "".join(webinar_strings)
