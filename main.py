@@ -17,8 +17,11 @@ def fetch_wc_url(auth_pair, url, params={}):
                         params=params)
         return r.json()
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as error:
-        print("Connection error:", error)
         app_logger.exception('Something bad:')
+
+
+def sanitaze_order_name(order_name):
+    return order_name.replace(' (репетиторские услуги)', '')
 
 
 def fetch_wc_processing_orders(url, auth_pair):
@@ -47,7 +50,7 @@ def fetch_wc_processing_orders(url, auth_pair):
                     for file in product_info['downloads']:
                         order['files'].add(file['file'])
                 order['products'][product['product_id']] = {
-                    'name': product['name']}
+                    'name': sanitaze_order_name(product['name'])}
                 if 'purchase_note' in product_info:
                     order['products'][product['product_id']
                                       ]['purchase_note'] = product_info['purchase_note']
@@ -64,7 +67,6 @@ def send_order(order, webinar_string, params):
     html = open('email_template.html').read()
     template = Template(html)
     email_message = template.render(**order_info)
-    # email_message = TEMPLATE_MESSAGE.format(**order_info)
     contents = [
         email_message
     ]
@@ -92,27 +94,34 @@ def change_order_status(auth_pair, url, order):
         else:
             return False
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as error:
-        print("Connection error:", error)
         app_logger.exception('Something bad:')
         return False
 
 
-def send_result_to_telegram(orders, telegram_bot_token, telegram_users):
+def create_result_message(orders) -> str:
     message = ""
     total = 0
     bad_orders = []
-    ids_orders = [order['id'] for order in orders]
+
+    message = "Обработано:\n"
+
     for order in orders:
+        products = ', '.join([product_info['name']
+                              for product_id, product_info in order['products'].items()])
+        message += f'Заказ №{order["id"]} ({products}) на {order["total"]} руб. \n'
+        total += float(order['total'])
         if order['status'] == False:
             bad_orders.append(order)
-            continue
-        total += float(order['total'])
-
-    message = f"Обработано {len(orders)} заказов на {total} руб."
-    message = f'{message}\n {ids_orders.__repr__()}'
+    if total != orders[0]["total"]:
+        message += f'Всего {len(orders)} заказов на {total} руб.'
     if bad_orders:
-        message = f'{message}\nОшибки: {ids_orders.__repr__()}'
+        bad_orders_id = [bad_order['id'] for bad_order in bad_orders]
+        message = f'{message}\nОшибки: {bad_orders_id}'
+    return message
 
+
+def send_result_to_telegram(orders, telegram_bot_token, telegram_users):
+    message = create_result_message(orders)
     bot = telebot.TeleBot(telegram_bot_token)
     for user in telegram_users:
         if user:
