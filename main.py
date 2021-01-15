@@ -112,7 +112,7 @@ def create_result_message(orders) -> str:
         total += float(order['total'])
         if order['status'] == False:
             bad_orders.append(order)
-    if total != orders[0]["total"]:
+    if len(orders) > 1:
         message += f'Всего {len(orders)} заказов на {total} руб.'
     if bad_orders:
         bad_orders_id = [bad_order['id'] for bad_order in bad_orders]
