@@ -138,7 +138,8 @@ def do_orders(orders, auth_pair, url, params):
                 webinar_strings.append(product_string)
         if webinar_strings:
             webinar_string = "".join(webinar_strings)
-            webinar_string = f'{webinar_string} {TELEGRAM_MANUAL}'
+            if 't.me' in webinar_string:
+                webinar_string = f'{webinar_string} {TELEGRAM_MANUAL}'
             webinar_string = str(''.join(webinar_string.split('\n')))
 
         send_result = send_order(
