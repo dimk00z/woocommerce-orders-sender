@@ -136,23 +136,29 @@ def send_result_to_telegram(orders, telegram_bot_token, telegram_users):
 
 
 def do_orders(orders, auth_pair, url, params):
+    hr = '<hr style="border-bottom: 0px">'
+
     for order_number, order in enumerate(orders):
         webinar_string = ""
-        webinar_strings = []
+        webinar_strings = [
+            '<p><b color="blue">Вы приобрели:</b></p><hr style="border-bottom: 0px">/n'
+        ]
         for product_id, product_info in order["products"].items():
-            # if str(product_id) in params["webinars"]:
-            if (
-                "purchase_note" in product_info
-                and len(product_info["purchase_note"]) > 0
-            ):
-                product_string = f"""<p><b color="blue">{product_info["name"]}</b></p><p>{product_info["purchase_note"]}
+            product_string = f"""<p><b color="blue">{product_info["name"]}</b></p><p>{product_info["purchase_note"]}
 </p><hr style="border-bottom: 0px">"""
-                webinar_strings.append(product_string)
-        if webinar_strings:
-            webinar_string = "".join(webinar_strings)
-            if "t.me" in webinar_string:
-                webinar_string = f"{webinar_string} {TELEGRAM_MANUAL}"
-            webinar_string = str("".join(webinar_string.split("\n")))
+            product_name = f'<p><b color="blue">{product_info["name"]}</b></p>'
+            product_description = (
+                f'<p>{product_info["purchase_note"]}</p>'
+                if "purchase_note" in product_info
+                and len(product_info["purchase_note"]) > 0
+                else ""
+            )
+            product_string = "".join([product_name, product_description, hr])
+            webinar_strings.append(product_string)
+        webinar_string = "".join(webinar_strings)
+        if "t.me" in webinar_string:
+            webinar_string = f"{webinar_string} {TELEGRAM_MANUAL}"
+        webinar_string = str("".join(webinar_string.split("\n")))
 
         send_result = send_order(order, webinar_string, params)
         orders[order_number]["send_result"] = send_result
@@ -178,7 +184,6 @@ def main():
                 "EMAIL_DISPLAY_NAME",
                 "SMTP_SERVER",
                 "SMTP_PORT",
-                # 'WEBINARS'
             ]
         )
 
