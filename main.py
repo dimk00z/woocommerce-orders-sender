@@ -144,10 +144,8 @@ def do_orders(orders, auth_pair, url, params):
             '<hr style="border-bottom: 0px"><p><b color="blue">Вы приобрели:</b></p>'
         ]
         for product_id, product_info in order["products"].items():
-            product_string = f"""<p><b color="blue">{product_info["name"]}</b></p><p>{product_info["purchase_note"]}
-</p><hr style="border-bottom: 0px">"""
-            product_name = f'<p><b color="blue">{product_info["name"]}</b></p>'
 
+            product_name = f'<p><b color="blue">{product_info["name"]}</b></p>'
             product_description = ""
 
             if "purchase_note" in product_info:
