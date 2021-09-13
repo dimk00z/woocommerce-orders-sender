@@ -136,23 +136,22 @@ def send_result_to_telegram(orders, telegram_bot_token, telegram_users):
 
 
 def do_orders(orders, auth_pair, url, params):
-    hr = '<hr style="border-bottom: 0px">'
+    # hr = '<hr style="border-bottom: 0px">'
 
     for order_number, order in enumerate(orders):
         webinar_string = ""
-        webinar_strings = [
-            '<hr style="border-bottom: 0px"><p><b color="blue">Вы приобрели:</b></p>'
-        ]
+        webinar_strings = ['<p><b color="blue">Вы приобрели:</b></p><ul>']
         for product_id, product_info in order["products"].items():
 
-            product_name = f'<p><b color="blue">{product_info["name"]}</b></p>'
+            product_name = f'<li><p><b color="blue">{product_info["name"]}</b></p>'
             product_description = ""
 
             if "purchase_note" in product_info:
                 product_description = f'<p>{product_info["purchase_note"]}</p>'
 
-            product_string = "".join([product_name, product_description, hr])
+            product_string = "".join([product_name, product_description, "</li>"])
             webinar_strings.append(product_string)
+        webinar_strings.append('</ul><hr style="border-bottom: 0px">')
         webinar_string = "".join(webinar_strings)
         if "t.me" in webinar_string:
             webinar_string = f"{webinar_string} {TELEGRAM_MANUAL}"
