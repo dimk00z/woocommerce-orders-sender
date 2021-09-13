@@ -22,6 +22,13 @@ HEADERS = {
 }
 
 
+with open(Path(".") / "email_template.txt") as template_file:
+    TEMPLATE_MESSAGE = template_file.read()
+
+with open(Path(".") / "telegram_manual.txt") as template_file:
+    TELEGRAM_MANUAL = template_file.read()
+
+
 def send_email(params, to_email, subject, contents, attachments):
     try:
         yag = yagmail.SMTP(
