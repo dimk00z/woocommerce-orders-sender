@@ -7,7 +7,7 @@ from utils.env import load_params
 from utils.logger import logger_config
 from utils.utils import HEADERS, TEMPLATE_MESSAGE, TELEGRAM_MANUAL, send_email
 
-TIMEOUT = 60
+TIMEOUT = 45
 
 app_logger = logging.getLogger("app_logger")
 
