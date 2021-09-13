@@ -5,7 +5,7 @@ from time import sleep
 from jinja2 import Template
 from utils.env import load_params
 from utils.logger import logger_config
-from utils.utils import HEADERS, TEMPLATE_MESSAGE, TELEGRAM_MANUAL, send_email
+from utils.utils import HEADERS, TELEGRAM_MANUAL, send_email
 
 TIMEOUT = 45
 
