@@ -141,18 +141,18 @@ def do_orders(orders, auth_pair, url, params):
     for order_number, order in enumerate(orders):
         webinar_string = ""
         webinar_strings = [
-            '<p><b color="blue">Вы приобрели:</b></p><hr style="border-bottom: 0px">/n'
+            '<hr style="border-bottom: 0px"><p><b color="blue">Вы приобрели:</b></p>'
         ]
         for product_id, product_info in order["products"].items():
             product_string = f"""<p><b color="blue">{product_info["name"]}</b></p><p>{product_info["purchase_note"]}
 </p><hr style="border-bottom: 0px">"""
             product_name = f'<p><b color="blue">{product_info["name"]}</b></p>'
-            product_description = (
-                f'<p>{product_info["purchase_note"]}</p>'
-                if "purchase_note" in product_info
-                and len(product_info["purchase_note"]) > 0
-                else ""
-            )
+
+            product_description = ""
+
+            if "purchase_note" in product_info:
+                product_description = f'<p>{product_info["purchase_note"]}</p>'
+
             product_string = "".join([product_name, product_description, hr])
             webinar_strings.append(product_string)
         webinar_string = "".join(webinar_strings)
