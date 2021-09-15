@@ -22,8 +22,8 @@ HEADERS = {
 }
 
 
-with open(Path(".") / "telegram_manual.txt") as template_file:
-    TELEGRAM_MANUAL = template_file.read()
+with open(Path(".") / "telegram_manual.txt", "rb") as template_file:
+    TELEGRAM_MANUAL = template_file.read().decode("UTF-8")
 
 
 def send_email(params, to_email, subject, contents, attachments):
