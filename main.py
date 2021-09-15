@@ -68,7 +68,8 @@ def send_order(order, webinar_string, params):
         "id": order["id"],
         "webinar_string": webinar_string,
     }
-    html = open("email_template.html").read()
+    with open("email_template.html", "rb") as f:
+        html = f.read().decode("UTF-8")
     template = Template(html)
     email_message = template.render(**order_info)
     contents = [email_message]
@@ -136,7 +137,6 @@ def send_result_to_telegram(orders, telegram_bot_token, telegram_users):
 
 
 def do_orders(orders, auth_pair, url, params):
-    # hr = '<hr style="border-bottom: 0px">'
 
     for order_number, order in enumerate(orders):
         webinar_string = ""
@@ -187,7 +187,6 @@ def main():
         auth_pair = (params["wc_user_key"], params["wc_secret_key"])
         url = f'{params["wc_url"]}/wp-json/wc/v3'
         orders = fetch_wc_processing_orders(url, auth_pair)
-
         if orders:
             orders = do_orders(orders, auth_pair, url, params)
             send_result_to_telegram(
