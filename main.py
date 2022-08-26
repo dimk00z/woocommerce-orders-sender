@@ -1,10 +1,13 @@
 import logging.config
 from time import sleep
+from typing import List
 
 import requests
 import telebot
 from jinja2 import Template
 
+from models.order import Order
+from services.woocommerce_fetcher import WoocommerceFetcher
 from utils.config import AppSettings, get_settings
 from utils.logger import logger_config
 from utils.utils import HEADERS, TELEGRAM_MANUAL, send_email
@@ -163,9 +166,14 @@ def main():
         logging.config.dictConfig(logger_config)
 
         app_settings: AppSettings = get_settings()
-        auth_pair = (app_settings.woocommerce_settings.user_key, app_settings.woocommerce_settings.secret_key)
-        url = f"{app_settings.woocommerce_settings.url}/wp-json/wc/v3"
-        orders = fetch_wc_processing_orders(url, auth_pair)
+        print(app_settings)
+        # auth_pair = (app_settings.woocommerce_settings.user_key, app_settings.woocommerce_settings.secret_key)
+        # url = f"{app_settings.woocommerce_settings.url}/wp-json/wc/v3"
+        # orders = fetch_wc_processing_orders(url, auth_pair)
+        orders_fetcher: WoocommerceFetcher = WoocommerceFetcher(
+            app_logger=app_logger, woocommerce_settings=app_settings.woocommerce_settings
+        )
+        orders: List[Order] = orders_fetcher.fetch_orders()
         print(orders)
         # if orders:
         #     orders = do_orders(orders, auth_pair, url, params)

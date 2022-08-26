@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 
 class Product(BaseModel):
-    id: str
+    name: str = ""
     purchase_note: str = ""
     files: List[str] = []
 
@@ -15,6 +15,6 @@ class Order(BaseModel):
     email: str
     first_name: str
     last_name: str
-    total_files: Set[str] = set()
+    total_files: List[str] = []
     status: bool = False
     products: List[Product] = []
