@@ -1,9 +1,11 @@
-import requests
-import telebot
 import logging.config
 from time import sleep
+
+import requests
+import telebot
 from jinja2 import Template
-from utils.env import load_params
+
+from utils.config import AppSettings, get_settings
 from utils.logger import logger_config
 from utils.utils import HEADERS, TELEGRAM_MANUAL, send_email
 
@@ -19,7 +21,7 @@ def fetch_wc_url(auth_pair, url, params={}):
         r = session.get(url, auth=auth_pair, params=params)
         return r.json()
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as error:
-        app_logger.exception("Something bad:")
+        app_logger.exception(f"Something bad: {error}")
 
 
 def sanitaze_order_name(order_name):
@@ -49,13 +51,9 @@ def fetch_wc_processing_orders(url, auth_pair):
                 if "downloads" in product_info:
                     for file in product_info["downloads"]:
                         order["files"].add(file["file"])
-                order["products"][product["product_id"]] = {
-                    "name": sanitaze_order_name(product["name"])
-                }
+                order["products"][product["product_id"]] = {"name": sanitaze_order_name(product["name"])}
                 if "purchase_note" in product_info:
-                    order["products"][product["product_id"]][
-                        "purchase_note"
-                    ] = product_info["purchase_note"]
+                    order["products"][product["product_id"]]["purchase_note"] = product_info["purchase_note"]
             order["files"] = list(order["files"])
             orders.append(order)
         return orders
@@ -110,12 +108,7 @@ def create_result_message(orders) -> str:
     message = "Обработано:\n"
 
     for order in orders:
-        products = ", ".join(
-            [
-                product_info["name"]
-                for product_id, product_info in order["products"].items()
-            ]
-        )
+        products = ", ".join([product_info["name"] for product_id, product_info in order["products"].items()])
         message += f'Заказ №{order["id"]} ({products}) на {order["total"]} руб. \n'
         total += float(order["total"])
         if order["status"] == False:
@@ -169,29 +162,16 @@ def main():
     try:
         logging.config.dictConfig(logger_config)
 
-        params = load_params(
-            required_params=[
-                "TELEGRAM_BOT_TOKEN",
-                "TELEGRAM_USERS_ID",
-                "WC_USER_KEY",
-                "WC_SECRET_KEY",
-                "WC_URL",
-                "EMAIL_SENDER",
-                "EMAIL_PASSWORD",
-                "EMAIL_DISPLAY_NAME",
-                "SMTP_SERVER",
-                "SMTP_PORT",
-            ]
-        )
-
-        auth_pair = (params["wc_user_key"], params["wc_secret_key"])
-        url = f'{params["wc_url"]}/wp-json/wc/v3'
+        app_settings: AppSettings = get_settings()
+        auth_pair = (app_settings.woocommerce_settings.user_key, app_settings.woocommerce_settings.secret_key)
+        url = f"{app_settings.woocommerce_settings.url}/wp-json/wc/v3"
         orders = fetch_wc_processing_orders(url, auth_pair)
-        if orders:
-            orders = do_orders(orders, auth_pair, url, params)
-            send_result_to_telegram(
-                orders, params["telegram_bot_token"], params["telegram_users_id"]
-            )
+        print(orders)
+        # if orders:
+        #     orders = do_orders(orders, auth_pair, url, params)
+        #     send_result_to_telegram(
+        #         orders, params["telegram_bot_token"], params["telegram_users_id"]
+        #     )
     except:
         app_logger.exception("Everything is bad:")
 
