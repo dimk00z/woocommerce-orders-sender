@@ -22,11 +22,10 @@ HEADERS = {
 
 class WoocommerceFetcher:
     @staticmethod
-    def _sanitaze_order_name(order_name) -> str:
+    def _sanitaze_order_name(*, order_name) -> str:
         return order_name.replace(" (репетиторские услуги)", "")
 
-    def _parse_orders(self, wc_processing_orders) -> List[Order]:
-        # TODO fix it
+    def _parse_orders(self, *, wc_processing_orders) -> List[Order]:
         orders: List[Order] = []
         for order_info in wc_processing_orders:
             order: Order = Order(
@@ -39,24 +38,28 @@ class WoocommerceFetcher:
             total_files: Set[str] = set()
             for product in order_info["line_items"]:
                 product_url = f'{self.url}/products/{product["product_id"]}'
-                product_info = self._fetch_wc_url(product_url, self.auth_pair)
+                product_info = self._fetch_wc_url(url=product_url)
                 fetched_product: Product = Product(
-                    name={"name": WoocommerceFetcher._sanitaze_order_name(product["name"])},
+                    name=WoocommerceFetcher._sanitaze_order_name(order_name=product["name"]),
                     purchase_note=product_info["purchase_note"] if "purchase_note" in product_info else "",
                 )
+                if fetched_product.purchase_note != "":
+                    print(fetched_product.purchase_note)
                 if "downloads" in product_info:
                     for file in product_info["downloads"]:
                         fetched_product.files.append(file["file"])
                         total_files.add(file["file"])
+                order.products.append(fetched_product)
             order.total_files = list(total_files)
+            orders.append(order)
         return orders
 
-    def __init__(self, woocommerce_settings: WoocommerceSettings, app_logger: logging.Logger) -> None:
+    def __init__(self, *, woocommerce_settings: WoocommerceSettings, app_logger: logging.Logger) -> None:
         self.auth_pair: Tuple[str, str] = (woocommerce_settings.user_key, woocommerce_settings.secret_key)
         self.url = f"{woocommerce_settings.url}/wp-json/wc/v3"
         self.logger = app_logger
 
-    def _fetch_wc_url(self, url, params={}):
+    def _fetch_wc_url(self, *, url, params={}):
         try:
             session = requests.Session()
             session.headers = HEADERS
@@ -70,7 +73,7 @@ class WoocommerceFetcher:
         orders: List[Order] = []
         orders_url = f"{self.url}/orders"
         params = {"status": "processing"}
-        wc_processing_orders = self._fetch_wc_url(orders_url, params)
+        wc_processing_orders = self._fetch_wc_url(url=orders_url, params=params)
         if wc_processing_orders:
-            orders = self._parse_orders(wc_processing_orders)
+            orders = self._parse_orders(wc_processing_orders=wc_processing_orders)
         return orders

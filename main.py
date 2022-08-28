@@ -175,11 +175,11 @@ def main():
         )
         orders: List[Order] = orders_fetcher.fetch_orders()
         print(orders)
-        # if orders:
-        #     orders = do_orders(orders, auth_pair, url, params)
-        #     send_result_to_telegram(
-        #         orders, params["telegram_bot_token"], params["telegram_users_id"]
-        #     )
+        if orders:
+            pass
+            # TODO do logic
+            # orders = do_orders(orders, auth_pair, url, params)
+            send_result_to_telegram(orders, params["telegram_bot_token"], params["telegram_users_id"])
     except:
         app_logger.exception("Everything is bad:")
 
