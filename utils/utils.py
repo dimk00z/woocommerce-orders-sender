@@ -1,9 +1,10 @@
-from pathlib import Path
-import smtplib
-import yagmail
 import logging.config
-from yagmail.error import YagInvalidEmailAddress, YagConnectionClosed, YagAddressError
+import smtplib
+from pathlib import Path
 
+import yagmail
+from yagmail.error import (YagAddressError, YagConnectionClosed,
+                           YagInvalidEmailAddress)
 
 app_logger = logging.getLogger("app_logger")
 

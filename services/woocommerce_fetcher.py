@@ -2,30 +2,34 @@ import logging
 from typing import List, Set, Tuple
 
 import requests
+
 from models.order import Order, Product
 from utils.config import WoocommerceSettings
-
-HEADERS = {
-    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3",
-    "accept-encoding": "gzip, deflate, br",
-    "accept-language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
-    "cache-control": "no-cache",
-    "dnt": "1",
-    "pragma": "no-cache",
-    "sec-fetch-mode": "navigate",
-    "sec-fetch-site": "none",
-    "sec-fetch-user": "?1",
-    "upgrade-insecure-requests": "1",
-    "user-agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36",
-}
+from utils.utils import HEADERS
 
 
 class WoocommerceFetcher:
     @staticmethod
     def _sanitaze_order_name(*, order_name) -> str:
+        """Simple sanitize func
+
+        Args:
+            order_name (_type_): _description_
+
+        Returns:
+            str: _description_
+        """
         return order_name.replace(" (репетиторские услуги)", "")
 
     def _parse_orders(self, *, wc_processing_orders) -> List[Order]:
+        """Get orders with processing status
+
+        Args:
+            wc_processing_orders (_type_): _description_
+
+        Returns:
+            List[Order]: _description_
+        """
         orders: List[Order] = []
         for order_info in wc_processing_orders:
             order: Order = Order(
@@ -56,10 +60,19 @@ class WoocommerceFetcher:
 
     def __init__(self, *, woocommerce_settings: WoocommerceSettings, app_logger: logging.Logger) -> None:
         self.auth_pair: Tuple[str, str] = (woocommerce_settings.user_key, woocommerce_settings.secret_key)
-        self.url = f"{woocommerce_settings.url}/wp-json/wc/v3"
+        self.url = woocommerce_settings.url
         self.logger = app_logger
 
     def _fetch_wc_url(self, *, url, params={}):
+        """Fetch woocommerce API
+
+        Args:
+            url (_type_): _description_
+            params (dict, optional): _description_. Defaults to {}.
+
+        Returns:
+            _type_: _description_
+        """
         try:
             session = requests.Session()
             session.headers = HEADERS
@@ -70,6 +83,11 @@ class WoocommerceFetcher:
             return None
 
     def fetch_orders(self) -> List[Order]:
+        """Main entart point for class
+
+        Returns:
+            List[Order]: _description_
+        """
         orders: List[Order] = []
         orders_url = f"{self.url}/orders"
         params = {"status": "processing"}

@@ -50,4 +50,6 @@ class AppSettings(BaseSettings):
 
 @lru_cache()
 def get_settings():
-    return AppSettings()
+    settings: AppSettings = AppSettings()
+    settings.woocommerce_settings.url = f"{settings.woocommerce_settings.url}/wp-json/wc/v3"
+    return settings
