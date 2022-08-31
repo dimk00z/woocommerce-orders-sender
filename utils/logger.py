@@ -20,12 +20,7 @@ class Telegram_Handler(logging.Handler):
 
 
 format_string = "{asctime} - {levelname} - {name} - {module}:{funcName}:{lineno}- {message}"
-# telegram_params = load_params(
-#     [
-#         "TELEGRAM_BOT_TOKEN",
-#         "TELEGRAM_USERS_ID",
-#     ]
-# )
+
 telegram_params: TelegramSettrings = get_settings().telegram_settings
 logger_config = {
     "version": 1,
@@ -35,8 +30,6 @@ logger_config = {
         "telegram_handler": {
             "()": Telegram_Handler,
             "formatter": "std_formatter",
-            # "telegram_bot_token": telegram_params["telegram_bot_token"],
-            # "telegram_users": telegram_params["telegram_users_id"],
             "telegram_bot_token": telegram_params.bot_token,
             "telegram_users": telegram_params.users_id,
         },
