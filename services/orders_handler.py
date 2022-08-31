@@ -182,16 +182,15 @@ class OrdersHandler:
         message: str = ""
         total: float = 0.0
         bad_orders = []
-        message = "Обработано:\n"
         for order in self.orders:
             if order.status is False:
                 bad_orders.append(order)
                 continue
-            products = ", ".join([product.name for product in order.products])
-            message += f"Заказ №{order.id} - {order.first_name} {order.last_name}, {order.email} ({products}) на {order.total} руб. \n"
+            products = "\n".join([f"· {product.name}" for product in order.products])
+            message += f"№ {order.id} - {order.first_name} {order.last_name}, {order.email} на **{order.total} руб.**\n {products}"
             total += order.total
         if len(self.orders) > 1:
-            message += f"Всего {len(self.orders)} заказов на {total} руб."
+            message += f"Всего {len(self.orders)} заказов на **{total} руб.**"
         if bad_orders:
             errors: List[str] = [f"{bad_order.id} - {bad_order.email}" for bad_order in bad_orders]
             message = f"{message}\nОшибки: {errors}"
