@@ -9,21 +9,21 @@
 
 ## Настройка и выполнение
 
-Работоспособноть проверена на Python 3.7/3.8. 
+Работоспособноть проверена на Python 3.8+. 
 Установка зависимостей `pip install -r requirements.txt`
 
 Для работы необходимо наличие .env файла:
 ```
-TELEGRAM_BOT_TOKEN=TOKE
-TELEGRAM_USERS_ID=ID1,ID2..
-WC_USER_KEY=user_key
-WC_SECRET_KEY=secret_key
-WC_URL=https://woo.com
-EMAIL_SENDER=woo
-EMAIL_PASSWORD=email_pass
-EMAIL_DISPLAY_NAME=send_name
-SMTP_SERVER=smtp.yandex.ru
-SMTP_PORT=465
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_USERS_ID=[""]
+WC_USER_KEY=
+WC_SECRET_KEY=
+WC_URL=
+EMAIL_SENDER=
+EMAIL_PASSWORD=
+EMAIL_DISPLAY_NAME=
+EMAIL_SMTP_SERVER=smtp.yandex.ru
+EMAIL_SMTP_PORT=465
 ```
 Для выполнения скрипта использовал cron:
 ```
