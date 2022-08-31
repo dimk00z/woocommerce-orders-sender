@@ -200,7 +200,7 @@ class OrdersHandler:
     def handle(self, *, timeout=45) -> str:
         for order_index, order in enumerate(self.orders):
             self.orders[order_index].status = self._handle_order(order=order)
-            if len(self.orders) == 1 or order_index + 1 == len(self.orders):
+            if order_index + 1 == len(self.orders):
                 break
             sleep(timeout)
         return self._create_result_message()
