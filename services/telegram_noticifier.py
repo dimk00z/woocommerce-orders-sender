@@ -1,9 +1,6 @@
 import logging
-from typing import List
 
 import telebot
-
-from models.order import Order
 from utils.config import TelegramSettrings
 
 

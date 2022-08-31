@@ -3,10 +3,14 @@ from typing import List, Set
 from pydantic import BaseModel
 
 
+class ProductFile(BaseModel):
+    file_name: str = ""
+    file_size: int = 0
+
+
 class Product(BaseModel):
     name: str = ""
     purchase_note: str = ""
-    files: List[str] = []
 
 
 class Order(BaseModel):
@@ -15,6 +19,6 @@ class Order(BaseModel):
     email: str
     first_name: str
     last_name: str
-    total_files: List[str] = []
+    total_files: List[ProductFile] = []
     status: bool = False
     products: List[Product] = []

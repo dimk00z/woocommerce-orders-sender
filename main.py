@@ -17,19 +17,21 @@ def main():
 
         app_settings: AppSettings = get_settings()
         orders_fetcher: WoocommerceFetcher = WoocommerceFetcher(
-            app_logger=app_logger, woocommerce_settings=app_settings.woocommerce_settings
+            app_logger=app_logger,
+            woocommerce_settings=app_settings.woocommerce_settings,
         )
         orders: List[Order] = orders_fetcher.fetch_orders()
+
         if not orders:
             return
-        print(orders)
-        telegram_noticifier: TelegramNoticifier = TelegramNoticifier(
-            app_logger=app_logger, settings=app_settings.telegram_settings
-        )
+
         orders_handler: OrdersHandler = OrdersHandler(
             orders=orders, app_logger=app_logger, settings=app_settings
         )
         result_message: str = orders_handler.handle()
+        telegram_noticifier: TelegramNoticifier = TelegramNoticifier(
+            app_logger=app_logger, settings=app_settings.telegram_settings
+        )
         telegram_noticifier.send_result_to_telegram(message=result_message)
     except:
         app_logger.exception("Everything is bad:")

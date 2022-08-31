@@ -4,12 +4,13 @@ from http import HTTPStatus
 from time import sleep
 from typing import Dict, List, Tuple
 
+import binpacking
 import requests
 import yagmail
 from jinja2 import Template
-from models.order import Order
+from models.order import Order, ProductFile
 from utils.config import AppSettings
-from utils.utils import HEADERS
+from utils.http import HEADERS
 from yagmail.error import YagAddressError, YagConnectionClosed, YagInvalidEmailAddress
 
 
@@ -55,15 +56,53 @@ class OrdersHandler:
         with open("email_template.html", "rb") as f:
             html = f.read().decode("UTF-8")
         template: Template = Template(html)
-        # TODO Add email file batching logic here
-        result: bool = self._send_email(
-            to_email=order.email,
-            subject=f"Заказ №{order.id}",
-            contents=[template.render(**order_info)],
-            attachments=order.total_files,
-        )
 
-        return result
+        if (
+            sum((file.file_size for file in order.total_files))
+            <= self.settings.email_settings.max_attachment_size
+        ):
+            return self._send_email(
+                to_email=order.email,
+                subject=f"Заказ №{order.id}",
+                contents=[template.render(**order_info)],
+                attachments=[file.file_name for file in order.total_files],
+            )
+        # Splitted logic
+        splitted_files: List[List[str]] = OrdersHandler._split_files(
+            files=order.total_files, max_attachment_size=self.settings.email_settings.max_attachment_size
+        )
+        results: List[bool] = []
+        for pack_index, file_pack in enumerate(splitted_files):
+            results.append(
+                self._send_email(
+                    to_email=order.email,
+                    subject=f"Заказ №{order.id} - часть {pack_index+1}",
+                    contents=[template.render(**order_info)],
+                    attachments=file_pack,
+                )
+            )
+        return all(results)
+
+    @staticmethod
+    def _split_files(
+        *, files: List[ProductFile], max_attachment_size: int, maximum_filling: float = 0.8
+    ) -> List[List[str]]:
+        """Split list of files by max capacity
+
+        Args:
+            files (List[ProductFile]): _description_
+            max_attachment_size (int): _description_
+            maximum_filling (float, optional): _description_. Defaults to 0.8.
+
+        Returns:
+            List[List[str]]: _description_
+        """
+
+        bins = binpacking.to_constant_volume(
+            d={file.file_name: file.file_size for file in files},
+            V_max=int(max_attachment_size * maximum_filling),
+        )
+        return [[file_name for file_name in bin] for bin in bins]
 
     def _send_email(self, *, to_email: str, subject: str, attachments: List[str], contents) -> bool:
         """Send email with yagmail
@@ -124,7 +163,6 @@ class OrdersHandler:
         """
         try:
             put_url = f"{self.settings.woocommerce_settings.url}/orders/{order.id}"
-            print(put_url)
             session = requests.Session()
             session.headers = HEADERS
             r = session.put(put_url, auth=self.auth_pair, params={"status": "completed"})
@@ -150,13 +188,13 @@ class OrdersHandler:
                 bad_orders.append(order)
                 continue
             products = ", ".join([product.name for product in order.products])
-            message += f"Заказ №{order.id} ({products}) на {order.total} руб. \n"
+            message += f"Заказ №{order.id} - {order.first_name} {order.last_name}, {order.email} ({products}) на {order.total} руб. \n"
             total += order.total
         if len(self.orders) > 1:
             message += f"Всего {len(self.orders)} заказов на {total} руб."
         if bad_orders:
-            bad_orders_id = [bad_order.id for bad_order in bad_orders]
-            message = f"{message}\nОшибки: {bad_orders_id}"
+            errors: List[str] = [f"{bad_order.id} - {bad_order.email}" for bad_order in bad_orders]
+            message = f"{message}\nОшибки: {errors}"
         return message
 
     def handle(self, *, timeout=45) -> str:

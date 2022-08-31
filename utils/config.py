@@ -18,6 +18,7 @@ class WoocommerceSettings(BaseSettings):
     user_key: str
     secret_key: str
     url: str
+    debug_email: str = "dimk00z@gmail.com"
 
     class Config:
         env_file = ".env"
@@ -31,6 +32,7 @@ class EmailSettings(BaseSettings):
     display_name: str
     smtp_server: str = "smtp.yandex.ru"
     smtp_port: int = 465
+    max_attachment_size: int = 25 * 1024 * 1024  # 30MB
 
     class Config:
         env_file = ".env"
