@@ -1,4 +1,0 @@
-<p> <br> &nbsp;
-Мессенджер Telegram вы можете скачать на официальном сайте <a href="https://telegram.org/">https://telegram.org/</a> 
-или воспользуйтесь онлайн версией <a href="https://web.telegram.org/">https://web.telegram.org/</a>
-</p>
