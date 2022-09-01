@@ -186,8 +186,8 @@ class OrdersHandler:
             if order.status is False:
                 bad_orders.append(order)
                 continue
-            products = "\n".join([f"· {product.name}" for product in order.products])
-            message += f"№ {order.id} - {order.first_name} {order.last_name}, {order.email} на **{order.total} руб.**\n {products}"
+            products = "\n".join([f" · {product.name}" for product in order.products])
+            message += f"№ {order.id} - {order.first_name} {order.last_name}, {order.email}\n{products}\n**{order.total} руб.**"
             total += order.total
         if len(self.orders) > 1:
             message += f"Всего {len(self.orders)} заказов на **{total} руб.**"
