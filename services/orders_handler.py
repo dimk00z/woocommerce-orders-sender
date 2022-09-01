@@ -187,10 +187,10 @@ class OrdersHandler:
                 bad_orders.append(order)
                 continue
             products = "\n".join([f" · {product.name}" for product in order.products])
-            message += f"№ {order.id} - {order.first_name} {order.last_name}, {order.email}\n{products}\n**{order.total} руб.**"
+            message += f"№ {order.id} - {order.first_name} {order.last_name}, {order.email}\n{products}\n{order.total} руб."
             total += order.total
         if len(self.orders) > 1:
-            message += f"Всего {len(self.orders)} заказов на **{total} руб.**"
+            message += f"Всего {len(self.orders)} заказов на {total} руб."
         if bad_orders:
             errors: List[str] = [f"{bad_order.id} - {bad_order.email}" for bad_order in bad_orders]
             message = f"{message}\nОшибки: {errors}"
