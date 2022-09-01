@@ -3,12 +3,15 @@ from pathlib import Path
 from typing import List, Set, Tuple
 
 import requests
+
 from models.order import Order, Product, ProductFile
 from utils.config import WoocommerceSettings
 from utils.http import HEADERS
 
 
 class WoocommerceFetcher:
+    """Class for fetching orders from woocommerce rest api"""
+
     def __init__(
         self, *, woocommerce_settings: WoocommerceSettings, app_logger: logging.Logger, debug: bool = False
     ) -> None:

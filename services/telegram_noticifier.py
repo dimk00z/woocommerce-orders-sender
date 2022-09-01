@@ -1,10 +1,13 @@
 import logging
 
 import telebot
+
 from utils.config import TelegramSettrings
 
 
 class TelegramNoticifier:
+    """Simple telegram noticifier"""
+
     def __init__(self, *, settings: TelegramSettrings, app_logger: logging.Logger) -> None:
         self.settings: TelegramSettrings = settings
         self.app_logger: logging.Logger = app_logger

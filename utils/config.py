@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import List
 
-from pydantic import BaseSettings, Field
+from pydantic import BaseSettings
 
 
 class TelegramSettrings(BaseSettings):
@@ -32,7 +32,7 @@ class EmailSettings(BaseSettings):
     display_name: str
     smtp_server: str = "smtp.yandex.ru"
     smtp_port: int = 465
-    max_attachment_size: int = 25 * 1024 * 1024  # 30MB
+    max_attachment_size: int = 25 * 1024 * 1024  # 25MB
 
     class Config:
         env_file = ".env"

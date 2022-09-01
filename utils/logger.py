@@ -5,7 +5,13 @@ import telebot
 from utils.config import TelegramSettrings, get_settings
 
 
-class Telegram_Handler(logging.Handler):
+class TelegramHandler(logging.Handler):
+    """Telegram logger
+
+    Args:
+        logging (_type_): _description_
+    """
+
     def __init__(self, telegram_bot_token, telegram_users):
         logging.Handler.__init__(self)
         self.telegram_bot_token = telegram_bot_token
@@ -28,7 +34,7 @@ logger_config = {
     "formatters": {"std_formatter": {"format": format_string, "style": "{"}},
     "handlers": {
         "telegram_handler": {
-            "()": Telegram_Handler,
+            "()": TelegramHandler,
             "formatter": "std_formatter",
             "telegram_bot_token": telegram_params.bot_token,
             "telegram_users": telegram_params.users_id,

@@ -8,13 +8,20 @@ import binpacking
 import requests
 import yagmail
 from jinja2 import Template
+from yagmail.error import (YagAddressError, YagConnectionClosed,
+                           YagInvalidEmailAddress)
+
 from models.order import Order, ProductFile
 from utils.config import AppSettings
 from utils.http import HEADERS
-from yagmail.error import YagAddressError, YagConnectionClosed, YagInvalidEmailAddress
 
 
 class OrdersHandler:
+    """Class for orders logic
+    sending emails
+    changing orders statuses
+    noticify results to telegram"""
+
     def __init__(
         self,
         *,
@@ -32,6 +39,42 @@ class OrdersHandler:
         )
         self.email_template = email_template
 
+    @staticmethod
+    def _get_order_info(*, order: Order) -> Dict[str, str]:
+        email_lines: List[str] = ['<p><b color="blue">Вы приобрели:</b></p><ul>']
+        for product in order.products:
+            product_description = f"<p>{product.purchase_note}</p>" if product.purchase_note else ""
+            email_lines.append(f'<li><p><b color="blue">{product.name}</b></p>{product_description}</li>')
+        email_lines.append('</ul><hr style="border-bottom: 0px">')
+        email_message: str = "".join(email_lines)
+        return {
+            "first_name": order.first_name,
+            "last_name": order.last_name,
+            "id": order.id,
+            "email_message": email_message,
+        }
+
+    @staticmethod
+    def _split_files(
+        *, files: List[ProductFile], max_attachment_size: int, maximum_filling: float = 0.8
+    ) -> List[List[str]]:
+        """Split list of files by max capacity
+
+        Args:
+            files (List[ProductFile]): _description_
+            max_attachment_size (int): _description_
+            maximum_filling (float, optional): _description_. Defaults to 0.8.
+
+        Returns:
+            List[List[str]]: _description_
+        """
+
+        bins = binpacking.to_constant_volume(
+            d={file.file_name: file.file_size for file in files},
+            V_max=int(max_attachment_size * maximum_filling),
+        )
+        return [[file_name for file_name in bin] for bin in bins]
+
     def _send_order_email(self, *, order: Order) -> bool:
         """Create email message and send it
 
@@ -41,18 +84,7 @@ class OrdersHandler:
         Returns:
             bool: _description_
         """
-        email_lines: List[str] = ['<p><b color="blue">Вы приобрели:</b></p><ul>']
-        for product in order.products:
-            product_description = f"<p>{product.purchase_note}</p>" if product.purchase_note else ""
-            email_lines.append(f'<li><p><b color="blue">{product.name}</b></p>{product_description}</li>')
-        email_lines.append('</ul><hr style="border-bottom: 0px">')
-        email_message: str = "".join(email_lines)
-        order_info: Dict[str, str] = {
-            "first_name": order.first_name,
-            "last_name": order.last_name,
-            "id": order.id,
-            "email_message": email_message,
-        }
+        order_info: Dict[str, str] = OrdersHandler._get_order_info(order=order)
         with open("email_template.html", "rb") as f:
             html = f.read().decode("UTF-8")
         template: Template = Template(html)
@@ -82,27 +114,6 @@ class OrdersHandler:
                 )
             )
         return all(results)
-
-    @staticmethod
-    def _split_files(
-        *, files: List[ProductFile], max_attachment_size: int, maximum_filling: float = 0.8
-    ) -> List[List[str]]:
-        """Split list of files by max capacity
-
-        Args:
-            files (List[ProductFile]): _description_
-            max_attachment_size (int): _description_
-            maximum_filling (float, optional): _description_. Defaults to 0.8.
-
-        Returns:
-            List[List[str]]: _description_
-        """
-
-        bins = binpacking.to_constant_volume(
-            d={file.file_name: file.file_size for file in files},
-            V_max=int(max_attachment_size * maximum_filling),
-        )
-        return [[file_name for file_name in bin] for bin in bins]
 
     def _send_email(self, *, to_email: str, subject: str, attachments: List[str], contents) -> bool:
         """Send email with yagmail
