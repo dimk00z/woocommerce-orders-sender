@@ -1,19 +1,27 @@
 import logging
-import smtplib
 from http import HTTPStatus
+from smtplib import SMTPAuthenticationError, SMTPDataError, SMTPSenderRefused, SMTPServerDisconnected
 from time import sleep
 from typing import Dict, List, Tuple
 
 import binpacking
 import requests
-import yagmail
 from jinja2 import Template
-from yagmail.error import (YagAddressError, YagConnectionClosed,
-                           YagInvalidEmailAddress)
-
 from models.order import Order, ProductFile
 from utils.config import AppSettings
 from utils.http import HEADERS
+from yagmail import SMTP
+from yagmail.error import YagAddressError, YagConnectionClosed, YagInvalidEmailAddress
+
+EMAIL_SENDING_ERRORS = (
+    YagInvalidEmailAddress,
+    YagConnectionClosed,
+    SMTPAuthenticationError,
+    YagAddressError,
+    SMTPDataError,
+    SMTPServerDisconnected,
+    SMTPSenderRefused,
+)
 
 
 class OrdersHandler:
@@ -130,7 +138,7 @@ class OrdersHandler:
         try:
             email_settings = self.settings.email_settings
 
-            yag = yagmail.SMTP(
+            yag = SMTP(
                 user={email_settings.sender: email_settings.display_name},
                 password=email_settings.password,
                 smtp_ssl=True,
@@ -140,14 +148,7 @@ class OrdersHandler:
             yag.send(to=to_email, subject=subject, contents=contents, attachments=attachments)
             return True
 
-        except (
-            YagInvalidEmailAddress,
-            YagConnectionClosed,
-            smtplib.SMTPAuthenticationError,
-            YagAddressError,
-            smtplib.SMTPDataError,
-            smtplib.SMTPServerDisconnected,
-        ) as ex:
+        except EMAIL_SENDING_ERRORS as ex:
             self.app_logger.exception(f"Everything is bad:{ex}")
             return False
 
