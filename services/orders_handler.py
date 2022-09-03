@@ -1,17 +1,20 @@
 import logging
 from http import HTTPStatus
-from smtplib import SMTPAuthenticationError, SMTPDataError, SMTPSenderRefused, SMTPServerDisconnected
+from smtplib import (SMTPAuthenticationError, SMTPDataError, SMTPSenderRefused,
+                     SMTPServerDisconnected)
 from time import sleep
 from typing import Dict, List, Tuple
 
 import binpacking
 import requests
 from jinja2 import Template
+from yagmail import SMTP
+from yagmail.error import (YagAddressError, YagConnectionClosed,
+                           YagInvalidEmailAddress)
+
 from models.order import Order, ProductFile
 from utils.config import AppSettings
 from utils.http import HEADERS
-from yagmail import SMTP
-from yagmail.error import YagAddressError, YagConnectionClosed, YagInvalidEmailAddress
 
 EMAIL_SENDING_ERRORS = (
     YagInvalidEmailAddress,
@@ -191,7 +194,7 @@ class OrdersHandler:
         Returns:
             str: _description_
         """
-        message: str = ""
+        message_lines: List[str] = []
         total: float = 0.0
         bad_orders = []
         for order in self.orders:
@@ -199,14 +202,18 @@ class OrdersHandler:
                 bad_orders.append(order)
                 continue
             products = "\n".join([f" · {product.name}" for product in order.products])
-            message += f"№ {order.id} - {order.first_name} {order.last_name}, {order.email}\n{products}\n{order.total} руб."
+            message_lines.append(
+                f"№ {order.id} - {order.first_name} {order.last_name}, {order.email}\n{products}\n{order.total} руб."
+            )
             total += order.total
         if len(self.orders) > 1:
-            message += f"Всего {len(self.orders)} заказов на {total} руб."
+            message_lines.append(f"Всего {len(self.orders)} заказов на {total} руб.")
         if bad_orders:
-            errors: List[str] = [f"{bad_order.id} - {bad_order.email}" for bad_order in bad_orders]
-            message = f"{message}\nОшибки: {errors}"
-        return message
+            message_lines.append("Ошибки:")
+            message_lines.append(
+                ", ".join([f"{bad_order.id} - {bad_order.email}" for bad_order in bad_orders])
+            )
+        return "\n".join(message_lines)
 
     def handle(self, *, timeout=45) -> str:
         for order_index, order in enumerate(self.orders):
