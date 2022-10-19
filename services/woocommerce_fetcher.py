@@ -4,6 +4,7 @@ from typing import List, Set, Tuple
 
 import requests
 from models.order import Order, Product, ProductFile
+from requests.exceptions import HTTPError
 from utils.config import WoocommerceSettings
 from utils.http import HEADERS
 
@@ -85,8 +86,13 @@ class WoocommerceFetcher:
             session = requests.Session()
             session.headers = HEADERS
             r = session.get(url, auth=self.auth_pair, params=params)
+            r.raise_for_status()
+
+            if r is None:
+                raise HTTPError
+
             return r.json()
-        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as error:
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout, HTTPError) as error:
             self.logger.exception(f"Something bad: {error}")
             return None
 
