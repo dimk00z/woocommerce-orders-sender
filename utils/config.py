@@ -19,6 +19,7 @@ class WoocommerceSettings(BaseSettings):
     secret_key: str
     url: str
     debug_email: str = "dimk00z@gmail.com"
+    redundant_phrase: str = " (материалы для преподавателей)"
 
     class Config:
         env_file = ".env"

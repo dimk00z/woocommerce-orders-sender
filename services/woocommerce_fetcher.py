@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import List, Set, Tuple
 
 import requests
-
 from models.order import Order, Product, ProductFile
 from utils.config import WoocommerceSettings
 from utils.http import HEADERS
@@ -19,11 +18,11 @@ class WoocommerceFetcher:
         self.url = woocommerce_settings.url
         self.logger = app_logger
         self.debug = debug
+        self.redundant_phrase: str = woocommerce_settings.redundant_phrase
         if self.debug:
             self.debug_email: str = woocommerce_settings.debug_email
 
-    @staticmethod
-    def _sanitaze_order_name(*, order_name) -> str:
+    def _sanitaze_order_name(self, *, order_name) -> str:
         """Simple sanitize func
 
         Args:
@@ -32,7 +31,7 @@ class WoocommerceFetcher:
         Returns:
             str: _description_
         """
-        return order_name.replace(" (репетиторские услуги)", "")
+        return order_name.replace(self.redundant_phrase, "")
 
     def _parse_orders(self, *, wc_processing_orders) -> List[Order]:
         """Get orders with processing status
@@ -57,7 +56,7 @@ class WoocommerceFetcher:
                 product_url = f'{self.url}/products/{product["product_id"]}'
                 product_info = self._fetch_wc_url(url=product_url)
                 fetched_product: Product = Product(
-                    name=WoocommerceFetcher._sanitaze_order_name(order_name=product["name"]),
+                    name=self._sanitaze_order_name(order_name=product["name"]),
                     purchase_note=product_info["purchase_note"] if "purchase_note" in product_info else "",
                 )
 
