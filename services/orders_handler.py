@@ -1,7 +1,6 @@
 import logging
 from http import HTTPStatus
-from smtplib import (SMTPAuthenticationError, SMTPDataError, SMTPSenderRefused,
-                     SMTPServerDisconnected)
+from smtplib import SMTPAuthenticationError, SMTPDataError, SMTPSenderRefused, SMTPServerDisconnected
 from time import sleep
 from typing import Dict, List, Tuple
 
@@ -9,8 +8,7 @@ import binpacking
 import requests
 from jinja2 import Template
 from yagmail import SMTP
-from yagmail.error import (YagAddressError, YagConnectionClosed,
-                           YagInvalidEmailAddress)
+from yagmail.error import YagAddressError, YagConnectionClosed, YagInvalidEmailAddress
 
 from models.order import Order, ProductFile
 from utils.config import AppSettings
@@ -52,7 +50,7 @@ class OrdersHandler:
 
     @staticmethod
     def _get_order_info(*, order: Order) -> Dict[str, str]:
-        email_lines: List[str] = ['<p><b color="blue">Вы приобрели:</b></p><ul>']
+        email_lines: List[str] = ['<p><b color="blue">Состав заказа:</b></p><ul>']
         for product in order.products:
             product_description = f"<p>{product.purchase_note}</p>" if product.purchase_note else ""
             email_lines.append(f'<li><p><b color="blue">{product.name}</b></p>{product_description}</li>')
