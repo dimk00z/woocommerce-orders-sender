@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from datetime import date, timedelta
 from sys import maxsize
@@ -22,7 +23,7 @@ class CouponeDiscount:
 
 COUPONE_DICSOUNT: tuple[CouponeDiscount, ...] = (
     CouponeDiscount(
-        min_total=600,
+        min_total=10,
         max_total=1499,
         discount_percent=5,
     ),
@@ -87,7 +88,11 @@ class CouponCreater:
 
         return coupone
 
-    def _get_coupon_name(self, name: str) -> str:
+    def _get_coupon_name(
+        self,
+        name: str,
+        pattern: str = "[^A-Za-z0-9_]+",
+    ) -> str:
         first_name_part = translit(
             "_".join(name.split()),
             "ru",
@@ -95,7 +100,7 @@ class CouponCreater:
         )
         second_name_part = str(uuid4()).split("-")[0]
         coupon_name = f"{first_name_part}_{second_name_part}"
-        return coupon_name.upper()
+        return str(re.sub(pattern, "", coupon_name.upper()))
 
     def _get_discount_percent(
         self,
