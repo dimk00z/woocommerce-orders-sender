@@ -100,7 +100,7 @@ class CouponCreater:
         )
         second_name_part = str(uuid4()).split("-")[0]
         coupon_name = f"{first_name_part}_{second_name_part}"
-        return str(re.sub(pattern, "", coupon_name.upper()))
+        return str(re.sub(pattern, "", coupon_name.lower()))
 
     def _get_discount_percent(
         self,
