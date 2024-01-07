@@ -13,9 +13,16 @@ class WoocommerceFetcher:
     """Class for fetching orders from woocommerce rest api"""
 
     def __init__(
-        self, *, woocommerce_settings: WoocommerceSettings, app_logger: logging.Logger, debug: bool = False
+        self,
+        *,
+        woocommerce_settings: WoocommerceSettings,
+        app_logger: logging.Logger,
+        debug: bool = False,
     ) -> None:
-        self.auth_pair: Tuple[str, str] = (woocommerce_settings.user_key, woocommerce_settings.secret_key)
+        self.auth_pair: Tuple[str, str] = (
+            woocommerce_settings.user_key,
+            woocommerce_settings.secret_key,
+        )
         self.url = woocommerce_settings.url
         self.logger = app_logger
         self.debug = debug
@@ -58,7 +65,9 @@ class WoocommerceFetcher:
                 product_info = self._fetch_wc_url(url=product_url)
                 fetched_product: Product = Product(
                     name=self._sanitaze_order_name(order_name=product["name"]),
-                    purchase_note=product_info["purchase_note"] if "purchase_note" in product_info else "",
+                    purchase_note=product_info["purchase_note"]
+                    if "purchase_note" in product_info
+                    else "",
                 )
 
                 if "downloads" in product_info:
@@ -66,7 +75,9 @@ class WoocommerceFetcher:
                         total_files.add(file["file"])
                 order.products.append(fetched_product)
             order.total_files = [
-                ProductFile(file_name=file_name, file_size=Path(file_name).stat().st_size)
+                ProductFile(
+                    file_name=file_name, file_size=Path(file_name).stat().st_size
+                )
                 for file_name in total_files
             ]
             orders.append(order)
@@ -92,7 +103,11 @@ class WoocommerceFetcher:
                 raise HTTPError
 
             return r.json()
-        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout, HTTPError) as error:
+        except (
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+            HTTPError,
+        ) as error:
             self.logger.exception(f"Something bad: {error}")
             return None
 

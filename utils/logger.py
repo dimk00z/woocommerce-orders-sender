@@ -1,4 +1,5 @@
 import logging.config
+import sys
 
 import telebot
 
@@ -25,7 +26,9 @@ class TelegramHandler(logging.Handler):
                 bot.send_message(user, message)
 
 
-format_string = "{asctime} - {levelname} - {name} - {module}:{funcName}:{lineno}- {message}"
+format_string = (
+    "{asctime} - {levelname} - {name} - {module}:{funcName}:{lineno}- {message}"
+)
 
 telegram_params: TelegramSettrings = get_settings().telegram_settings
 logger_config = {
@@ -39,11 +42,20 @@ logger_config = {
             "telegram_bot_token": telegram_params.bot_token,
             "telegram_users": telegram_params.users_id,
         },
+        "console_stdout": {
+            "class": "logging.StreamHandler",
+            "level": "DEBUG",
+            "formatter": "std_formatter",
+            "stream": sys.stdout,
+        },
     },
     "loggers": {
         "app_logger": {
             "level": "DEBUG",
-            "handlers": ["telegram_handler"],
+            "handlers": [
+                "telegram_handler",
+                "console_stdout",
+            ],
             "propagate": False,
         }
     },

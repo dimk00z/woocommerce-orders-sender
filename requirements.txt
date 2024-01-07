@@ -1,3 +1,4 @@
+backoff==2.2.1
 binpacking==1.5.2
 black==22.6.0
 cachetools==5.2.0
@@ -21,8 +22,10 @@ pydantic==1.9.2
 pyTelegramBotAPI==3.7.3
 python-dotenv==0.14.0
 requests==2.28.1
+ruff==0.1.11
 six==1.16.0
 tomli==2.0.1
+transliterate==1.10.2
 types-requests==2.28.9
 types-urllib3==1.26.23
 typing_extensions==4.3.0

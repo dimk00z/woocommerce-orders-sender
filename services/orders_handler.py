@@ -1,6 +1,11 @@
 import logging
 from http import HTTPStatus
-from smtplib import SMTPAuthenticationError, SMTPDataError, SMTPSenderRefused, SMTPServerDisconnected
+from smtplib import (
+    SMTPAuthenticationError,
+    SMTPDataError,
+    SMTPSenderRefused,
+    SMTPServerDisconnected,
+)
 from time import sleep
 from typing import Dict, List, Tuple
 
@@ -11,6 +16,7 @@ from yagmail import SMTP
 from yagmail.error import YagAddressError, YagConnectionClosed, YagInvalidEmailAddress
 
 from models.order import Order, ProductFile
+from services.coupon_creater import Coupon, CouponCreater
 from utils.config import AppSettings
 from utils.http import HEADERS
 
@@ -48,13 +54,19 @@ class OrdersHandler:
         )
         self.email_template = email_template
 
-    @staticmethod
-    def _get_order_info(*, order: Order) -> Dict[str, str]:
+    def _get_order_info(self, *, order: Order) -> Dict[str, str]:
         email_lines: List[str] = ['<p><b color="blue">Состав заказа:</b></p><ul>']
         for product in order.products:
-            product_description = f"<p>{product.purchase_note}</p>" if product.purchase_note else ""
-            email_lines.append(f'<li><p><b color="blue">{product.name}</b></p>{product_description}</li>')
+            product_description = (
+                f"<p>{product.purchase_note}</p>" if product.purchase_note else ""
+            )
+            email_lines.append(
+                f'<li><p><b color="blue">{product.name}</b></p>{product_description}</li>'
+            )
         email_lines.append('</ul><hr style="border-bottom: 0px">')
+
+        self._add_coupone_if_total_ok(order, email_lines)
+
         email_message: str = "".join(email_lines)
         return {
             "first_name": order.first_name,
@@ -63,9 +75,37 @@ class OrdersHandler:
             "email_message": email_message,
         }
 
+    def _add_coupone_if_total_ok(
+        self,
+        order: Order,
+        email_lines: List[str],
+    ):
+        coupon: Coupon | None = CouponCreater(
+            total=order.total,
+            name=order.first_name,
+            settings=self.settings.woocommerce_settings,
+        )()
+        if coupon is None:
+            return
+
+        email_lines.append(
+            "".join(
+                (
+                    "<p>",
+                    f"""Хочу поблагодарить вас за выбор моих материалов скидкой <b>{coupon.discount_percent} %</b>.<br />Вводите на сайте ваш промокод <b>{coupon.coupon_name}</b> и покупайте с выгодой!<br />
+                Он будет действовать в течение недели со дня этой покупки""",
+                    "</p>",
+                    '<hr style="border-bottom: 0px">',
+                )
+            )
+        )
+
     @staticmethod
     def _split_files(
-        *, files: List[ProductFile], max_attachment_size: int, maximum_filling: float = 0.8
+        *,
+        files: List[ProductFile],
+        max_attachment_size: int,
+        maximum_filling: float = 0.8,
     ) -> List[List[str]]:
         """Split list of files by max capacity
 
@@ -93,7 +133,7 @@ class OrdersHandler:
         Returns:
             bool: _description_
         """
-        order_info: Dict[str, str] = OrdersHandler._get_order_info(order=order)
+        order_info: Dict[str, str] = self._get_order_info(order=order)
         with open("email_template.html", "rb") as f:
             html = f.read().decode("UTF-8")
         template: Template = Template(html)
@@ -110,7 +150,8 @@ class OrdersHandler:
             )
         # Splitted logic
         splitted_files: List[List[str]] = OrdersHandler._split_files(
-            files=order.total_files, max_attachment_size=self.settings.email_settings.max_attachment_size
+            files=order.total_files,
+            max_attachment_size=self.settings.email_settings.max_attachment_size,
         )
         results: List[bool] = []
         for pack_index, file_pack in enumerate(splitted_files):
@@ -124,7 +165,14 @@ class OrdersHandler:
             )
         return all(results)
 
-    def _send_email(self, *, to_email: str, subject: str, attachments: List[str], contents) -> bool:
+    def _send_email(
+        self,
+        *,
+        to_email: str,
+        subject: str,
+        attachments: List[str],
+        contents,
+    ) -> bool:
         """Send email with yagmail
 
         Args:
@@ -146,7 +194,12 @@ class OrdersHandler:
                 host=email_settings.smtp_server,
                 port=int(email_settings.smtp_port),
             )
-            yag.send(to=to_email, subject=subject, contents=contents, attachments=attachments)
+            yag.send(
+                to=to_email,
+                subject=subject,
+                contents=contents,
+                attachments=attachments,
+            )
             return True
 
         except EMAIL_SENDING_ERRORS as ex:
@@ -178,10 +231,12 @@ class OrdersHandler:
             put_url = f"{self.settings.woocommerce_settings.url}/orders/{order.id}"
             session = requests.Session()
             session.headers = HEADERS
-            r = session.put(put_url, auth=self.auth_pair, params={"status": "completed"})
+            r = session.put(
+                put_url, auth=self.auth_pair, params={"status": "completed"}
+            )
             if r.status_code == HTTPStatus.OK:
                 return True
-        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as error:
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
             self.app_logger.exception("Something bad:")
 
         return False
@@ -209,7 +264,9 @@ class OrdersHandler:
         if bad_orders:
             message_lines.append("Ошибки:")
             message_lines.append(
-                ", ".join([f"{bad_order.id} - {bad_order.email}" for bad_order in bad_orders])
+                ", ".join(
+                    [f"{bad_order.id} - {bad_order.email}" for bad_order in bad_orders]
+                )
             )
         return "\n".join(message_lines)
 

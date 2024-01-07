@@ -19,6 +19,7 @@ def main():
         orders_fetcher: WoocommerceFetcher = WoocommerceFetcher(
             app_logger=app_logger,
             woocommerce_settings=app_settings.woocommerce_settings,
+            debug=True,
         )
         orders: List[Order] = orders_fetcher.fetch_orders()
 
@@ -33,8 +34,8 @@ def main():
             app_logger=app_logger, settings=app_settings.telegram_settings
         )
         telegram_noticifier.send_result_to_telegram(message=result_message)
-    except:
-        app_logger.exception("Everything is bad:")
+    except Exception as ex:
+        app_logger.exception("Everything is bad: %s", ex)
 
 
 if __name__ == "__main__":

@@ -33,7 +33,7 @@ class EmailSettings(BaseSettings):
     display_name: str
     smtp_server: str = "smtp.yandex.ru"
     smtp_port: int = 465
-    max_attachment_size: int = 25 * 1024 * 1024  # 25MB
+    max_attachment_size: int = 20 * 1024 * 1024  # 20MB
 
     class Config:
         env_file = ".env"
@@ -54,5 +54,7 @@ class AppSettings(BaseSettings):
 @lru_cache()
 def get_settings():
     settings: AppSettings = AppSettings()
-    settings.woocommerce_settings.url = f"{settings.woocommerce_settings.url}/wp-json/wc/v3"
+    settings.woocommerce_settings.url = (
+        f"{settings.woocommerce_settings.url}/wp-json/wc/v3"
+    )
     return settings
