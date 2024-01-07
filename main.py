@@ -19,7 +19,7 @@ def main():
         orders_fetcher: WoocommerceFetcher = WoocommerceFetcher(
             app_logger=app_logger,
             woocommerce_settings=app_settings.woocommerce_settings,
-            debug=True,
+            debug=app_settings.debug,
         )
         orders: List[Order] = orders_fetcher.fetch_orders()
 

@@ -42,6 +42,7 @@ class EmailSettings(BaseSettings):
 
 
 class AppSettings(BaseSettings):
+    debug: bool = False
     telegram_settings: TelegramSettrings = TelegramSettrings()
     woocommerce_settings: WoocommerceSettings = WoocommerceSettings()
     email_settings: EmailSettings = EmailSettings()
