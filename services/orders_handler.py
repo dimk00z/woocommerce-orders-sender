@@ -80,9 +80,6 @@ class OrdersHandler:
         }
 
     def _check_products_for_discount(self, order: Order) -> bool:
-        if order.total <= 0:
-            return False
-
         products_without_discount: List[Product] = []
 
         for product in order.products:
@@ -93,14 +90,14 @@ class OrdersHandler:
                     products_without_discount.append(product)
                     break
 
-        return len(products_without_discount) <= len(order.products)
+        return len(products_without_discount) == len(order.products)
 
     def _add_coupon_if_order_ok(
         self,
         order: Order,
         email_lines: List[str],
     ):
-        if self._check_products_for_discount(order) is False:
+        if order.total <= 0 or self._check_products_for_discount(order):
             return
 
         coupon: Coupon | None = CouponCreater(
