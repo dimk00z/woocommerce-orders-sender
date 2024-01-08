@@ -15,7 +15,7 @@ from jinja2 import Template
 from yagmail import SMTP
 from yagmail.error import YagAddressError, YagConnectionClosed, YagInvalidEmailAddress
 
-from models.order import Order, ProductFile
+from models.order import Order, Product, ProductFile
 from services.coupon_creater import Coupon, CouponCreater
 from utils.config import AppSettings
 from utils.http import HEADERS
@@ -29,6 +29,10 @@ EMAIL_SENDING_ERRORS = (
     SMTPServerDisconnected,
     SMTPSenderRefused,
 )
+
+PRODUCTS_WITHOUT_COUPON: List[str] = [
+    "оплата занятий",
+]
 
 
 class OrdersHandler:
@@ -80,6 +84,19 @@ class OrdersHandler:
         order: Order,
         email_lines: List[str],
     ):
+        products_without_discount: List[Product] = []
+
+        for product in order.products:
+            if product in products_without_discount:
+                continue
+            for skip_product_name in PRODUCTS_WITHOUT_COUPON:
+                if skip_product_name in product.name.lower():
+                    products_without_discount.append(product)
+                    break
+
+        if len(products_without_discount) >= len(order.products):
+            return
+
         coupon: Coupon | None = CouponCreater(
             total=order.total,
             name=order.first_name,
