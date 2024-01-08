@@ -69,7 +69,7 @@ class OrdersHandler:
             )
         email_lines.append('</ul><hr style="border-bottom: 0px">')
 
-        self._add_coupone_if_total_ok(order, email_lines)
+        self._add_coupon_if_order_ok(order, email_lines)
 
         email_message: str = "".join(email_lines)
         return {
@@ -79,11 +79,10 @@ class OrdersHandler:
             "email_message": email_message,
         }
 
-    def _add_coupone_if_total_ok(
-        self,
-        order: Order,
-        email_lines: List[str],
-    ):
+    def _check_products_for_discount(self, order: Order) -> bool:
+        if order.total <= 0:
+            return False
+
         products_without_discount: List[Product] = []
 
         for product in order.products:
@@ -94,7 +93,14 @@ class OrdersHandler:
                     products_without_discount.append(product)
                     break
 
-        if len(products_without_discount) >= len(order.products):
+        return len(products_without_discount) <= len(order.products)
+
+    def _add_coupon_if_order_ok(
+        self,
+        order: Order,
+        email_lines: List[str],
+    ):
+        if self._check_products_for_discount(order) is False:
             return
 
         coupon: Coupon | None = CouponCreater(
