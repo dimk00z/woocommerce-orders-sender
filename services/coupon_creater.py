@@ -23,24 +23,14 @@ class CouponeDiscount:
 
 COUPONE_DICSOUNT: tuple[CouponeDiscount, ...] = (
     CouponeDiscount(
-        min_total=10,
-        max_total=1499,
-        discount_percent=5,
-    ),
-    CouponeDiscount(
-        min_total=1500,
-        max_total=2499,
+        min_total=1000,
+        max_total=2999,
         discount_percent=10,
     ),
     CouponeDiscount(
-        min_total=2500,
-        max_total=3499,
-        discount_percent=15,
-    ),
-    CouponeDiscount(
-        min_total=3500,
+        min_total=3000,
         max_total=maxsize,
-        discount_percent=20,
+        discount_percent=15,
     ),
 )
 
