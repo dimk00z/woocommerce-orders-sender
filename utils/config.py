@@ -7,6 +7,7 @@ from pydantic import BaseSettings
 class TelegramSettrings(BaseSettings):
     bot_token: str
     users_id: List[str]
+    proxy: str = ""
 
     class Config:
         env_file = ".env"

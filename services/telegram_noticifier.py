@@ -1,6 +1,7 @@
 import logging
 
 import telebot
+from telebot import apihelper
 
 from utils.config import TelegramSettrings
 
@@ -12,6 +13,11 @@ class TelegramNoticifier:
         self, *, settings: TelegramSettrings, app_logger: logging.Logger
     ) -> None:
         self.settings: TelegramSettrings = settings
+        if settings.proxy:
+            apihelper.proxy = {
+                "http": settings.proxy,
+                "https": settings.proxy,
+            }
         self.app_logger: logging.Logger = app_logger
         self.bot = telebot.TeleBot(self.settings.bot_token)
 
