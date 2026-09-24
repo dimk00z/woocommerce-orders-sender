@@ -13,8 +13,8 @@ class ProxyLoader:
     )
     # socks5 first, then http; https/socks4 skipped
     PROTOCOL_PRIORITY = {
-        "socks5": 0,
-        "http": 1,
+        "http": 0,
+        "socks5": 1,
     }
 
     def __init__(self) -> None:
