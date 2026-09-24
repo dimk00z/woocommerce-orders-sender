@@ -18,8 +18,10 @@ class TelegramNoticifier:
     ) -> None:
         self.settings: TelegramSettrings = settings
         self.app_logger: logging.Logger = app_logger
-        self.bot = telebot.TeleBot(self.settings.bot_token, timeout=15)
-        self.proxy_loader = ProxyLoader(app_logger=app_logger)
+        apihelper.CONNECT_TIMEOUT = 10
+        apihelper.READ_TIMEOUT = 15
+        self.bot = telebot.TeleBot(self.settings.bot_token)
+        self.proxy_loader = ProxyLoader()
 
     def _set_proxy(self, proxy_url: Optional[str]) -> None:
         if proxy_url:
@@ -51,16 +53,11 @@ class TelegramNoticifier:
         try:
             for user_id in self.settings.users_id:
                 self.bot.send_message(chat_id=user_id, text=message)
-            self.app_logger.info(
-                "Telegram message sent via proxy=%s", proxy_url or "direct"
-            )
+            # console only — app_logger would recurse into TelegramHandler
+            print(f"Telegram message sent via proxy={proxy_url or 'direct'}")
             return True
         except Exception as ex:
-            self.app_logger.warning(
-                "Telegram send failed via proxy=%s: %s",
-                proxy_url or "direct",
-                ex,
-            )
+            print(f"Telegram send failed via proxy={proxy_url or 'direct'}: {ex}")
             return False
 
     def send_result_to_telegram(self, *, message: str):
@@ -69,4 +66,4 @@ class TelegramNoticifier:
             if self._send_with_proxy(message=message, proxy_url=proxy_url):
                 return
 
-        self.app_logger.error("Failed to send telegram message via all proxies")
+        print("Failed to send telegram message via all proxies")

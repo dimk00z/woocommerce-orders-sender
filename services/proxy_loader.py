@@ -1,4 +1,3 @@
-import logging
 from typing import List
 
 import requests
@@ -19,12 +18,13 @@ class ProxyLoader:
         "http": 2,
     }
 
-    def __init__(self, *, app_logger: logging.Logger) -> None:
-        self.app_logger = app_logger
+    def __init__(self) -> None:
         self.proxies: List[Proxy] = []
 
     def act(self) -> List[Proxy]:
         """Fetch all proxies and sort: https → socks5 → http, then by score."""
+        if self.proxies:
+            return self.proxies
         try:
             response = requests.get(self.URL, timeout=30)
             response.raise_for_status()
@@ -39,8 +39,8 @@ class ProxyLoader:
                 )
             )
             self.proxies = proxies
-            self.app_logger.info("Loaded %s proxies", len(self.proxies))
+            print(f"Loaded {len(self.proxies)} proxies")
         except Exception as ex:
-            self.app_logger.exception("Failed to load proxies: %s", ex)
+            print(f"Failed to load proxies: {ex}")
             self.proxies = []
         return self.proxies
