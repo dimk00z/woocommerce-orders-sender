@@ -5,11 +5,11 @@ from models.proxy import Proxy
 
 
 class ProxyLoader:
-    """Load free proxies from proxifly all-list, ordered by protocol priority."""
+    """Load free US proxies from proxifly, ordered by protocol priority."""
 
     URL = (
         "https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list"
-        "@main/proxies/all/data.json"
+        "@main/proxies/countries/US/data.json"
     )
     # socks5 first, then http; https/socks4 skipped
     PROTOCOL_PRIORITY = {
@@ -21,7 +21,7 @@ class ProxyLoader:
         self.proxies: List[Proxy] = []
 
     def act(self) -> List[Proxy]:
-        """Fetch all proxies and sort: socks5 → http, then by score."""
+        """Fetch US proxies and sort: socks5 → http, then by score."""
         if self.proxies:
             return self.proxies
         try:
