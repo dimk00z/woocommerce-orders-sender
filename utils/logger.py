@@ -34,22 +34,11 @@ class TelegramHandler(logging.Handler):
     def _proxy_candidates(self) -> List[str]:
         if self._candidates is not None:
             return self._candidates
-
-        candidates: List[str] = []
-        if self.telegram_proxy:
-            candidates.append(self.telegram_proxy)
-
-        # Loader returns socks5 → http
-        for proxy in self._proxy_loader.act():
-            if proxy.proxy and proxy.proxy not in candidates:
-                candidates.append(proxy.proxy)
-            if len(candidates) >= self.MAX_PROXY_ATTEMPTS:
-                break
-
-        if not candidates:
-            candidates.append("")
-        self._candidates = candidates
-        return candidates
+        self._candidates = self._proxy_loader.candidates(
+            configured=self.telegram_proxy,
+            limit=self.MAX_PROXY_ATTEMPTS,
+        )
+        return self._candidates
 
     def _send_with_proxy(self, *, message: str, proxy_url: Optional[str]) -> bool:
         self._set_proxy(proxy_url or None)
@@ -57,6 +46,8 @@ class TelegramHandler(logging.Handler):
             for user in self.telegram_users:
                 if user:
                     self.bot.send_message(user, message)
+            if proxy_url:
+                self._proxy_loader.save_last_success(proxy_url)
             return True
         except Exception:
             return False

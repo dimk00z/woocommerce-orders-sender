@@ -1,6 +1,6 @@
 import logging
 import re
-from typing import List, Optional
+from typing import Optional
 
 import telebot
 from requests.exceptions import ConnectionError as RequestsConnectionError
@@ -59,28 +59,14 @@ class TelegramNoticifier:
         else:
             apihelper.proxy = None
 
-    def _proxy_candidates(self) -> List[str]:
-        candidates: List[str] = []
-        if self.settings.proxy:
-            candidates.append(self.settings.proxy)
-
-        # Loader returns socks5 → http
-        for proxy in self.proxy_loader.act():
-            if proxy.proxy and proxy.proxy not in candidates:
-                candidates.append(proxy.proxy)
-            if len(candidates) >= self.MAX_PROXY_ATTEMPTS:
-                break
-
-        if not candidates:
-            candidates.append("")
-        return candidates
-
     def _send_with_proxy(self, *, message: str, proxy_url: Optional[str]) -> bool:
         self._set_proxy(proxy_url or None)
         try:
             for user_id in self.settings.users_id:
                 self.bot.send_message(chat_id=user_id, text=message)
             print(f"Telegram message sent via proxy={proxy_url or 'direct'}")
+            if proxy_url:
+                self.proxy_loader.save_last_success(proxy_url)
             return True
         except (RequestsConnectionError, MaxRetryError, SSLError, Timeout) as ex:
             print(
@@ -97,7 +83,10 @@ class TelegramNoticifier:
 
     def send_result_to_telegram(self, *, message: str):
         """Send message for users, trying proxies until one works."""
-        for proxy_url in self._proxy_candidates():
+        for proxy_url in self.proxy_loader.candidates(
+            configured=self.settings.proxy,
+            limit=self.MAX_PROXY_ATTEMPTS,
+        ):
             if self._send_with_proxy(message=message, proxy_url=proxy_url):
                 return
 
