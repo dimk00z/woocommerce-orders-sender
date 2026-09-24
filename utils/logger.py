@@ -39,6 +39,7 @@ class TelegramHandler(logging.Handler):
         if self.telegram_proxy:
             candidates.append(self.telegram_proxy)
 
+        # Loader returns socks5 → http
         for proxy in self._proxy_loader.act():
             if proxy.proxy and proxy.proxy not in candidates:
                 candidates.append(proxy.proxy)

@@ -1,11 +1,38 @@
 import logging
+import re
 from typing import List, Optional
 
 import telebot
+from requests.exceptions import ConnectionError as RequestsConnectionError
+from requests.exceptions import SSLError, Timeout
 from telebot import apihelper
+from urllib3.exceptions import MaxRetryError
 
 from services.proxy_loader import ProxyLoader
 from utils.config import TelegramSettrings
+
+
+def format_telegram_send_error(ex: BaseException) -> str:
+    """Short safe error text (no bot token / full request URL)."""
+    if isinstance(ex, MaxRetryError) or (
+        isinstance(ex, RequestsConnectionError)
+        and "Max retries exceeded" in str(ex)
+    ):
+        cause = ex.args[0] if ex.args else None
+        reason = getattr(cause, "reason", None) or cause or ex
+        reason_text = re.sub(r"/bot[^/\s?]+", "/bot***", str(reason))
+        if "timed out" in reason_text.lower() or "ConnectTimeout" in reason_text:
+            return "Max retries exceeded (connect timeout)"
+        if "SSL" in reason_text or "Certificate" in reason_text:
+            return "Max retries exceeded (ssl error)"
+        if "unreachable" in reason_text.lower():
+            return "Max retries exceeded (network unreachable)"
+        return f"Max retries exceeded ({reason_text[:120]})"
+
+    if isinstance(ex, (SSLError, Timeout, RequestsConnectionError)):
+        return re.sub(r"/bot[^/\s?]+", "/bot***", str(ex))[:160]
+
+    return re.sub(r"/bot[^/\s?]+", "/bot***", str(ex))[:160]
 
 
 class TelegramNoticifier:
@@ -37,7 +64,7 @@ class TelegramNoticifier:
         if self.settings.proxy:
             candidates.append(self.settings.proxy)
 
-        # Loader returns https → socks5 → http
+        # Loader returns socks5 → http
         for proxy in self.proxy_loader.act():
             if proxy.proxy and proxy.proxy not in candidates:
                 candidates.append(proxy.proxy)
@@ -53,11 +80,19 @@ class TelegramNoticifier:
         try:
             for user_id in self.settings.users_id:
                 self.bot.send_message(chat_id=user_id, text=message)
-            # console only — app_logger would recurse into TelegramHandler
             print(f"Telegram message sent via proxy={proxy_url or 'direct'}")
             return True
+        except (RequestsConnectionError, MaxRetryError, SSLError, Timeout) as ex:
+            print(
+                f"Telegram send failed via proxy={proxy_url or 'direct'}: "
+                f"{format_telegram_send_error(ex)}"
+            )
+            return False
         except Exception as ex:
-            print(f"Telegram send failed via proxy={proxy_url or 'direct'}: {ex}")
+            print(
+                f"Telegram send failed via proxy={proxy_url or 'direct'}: "
+                f"{format_telegram_send_error(ex)}"
+            )
             return False
 
     def send_result_to_telegram(self, *, message: str):

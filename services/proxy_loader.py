@@ -11,18 +11,17 @@ class ProxyLoader:
         "https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list"
         "@main/proxies/all/data.json"
     )
-    # https first, then socks5, then http; socks4 skipped
+    # socks5 first, then http; https/socks4 skipped
     PROTOCOL_PRIORITY = {
-        "https": 0,
-        "socks5": 1,
-        "http": 2,
+        "socks5": 0,
+        "http": 1,
     }
 
     def __init__(self) -> None:
         self.proxies: List[Proxy] = []
 
     def act(self) -> List[Proxy]:
-        """Fetch all proxies and sort: https → socks5 → http, then by score."""
+        """Fetch all proxies and sort: socks5 → http, then by score."""
         if self.proxies:
             return self.proxies
         try:
