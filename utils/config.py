@@ -34,6 +34,7 @@ class EmailSettings(BaseSettings):
     display_name: str
     smtp_server: str = "smtp.yandex.ru"
     smtp_port: int = 465
+    smtp_login: str = ""
     max_attachment_size: int = 20 * 1024 * 1024  # 20MB
 
     class Config:

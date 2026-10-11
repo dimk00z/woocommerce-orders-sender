@@ -12,11 +12,11 @@ from typing import Dict, List, Tuple
 import binpacking
 import requests
 from jinja2 import Template
-from yagmail import SMTP
 from yagmail.error import YagAddressError, YagConnectionClosed, YagInvalidEmailAddress
 
 from models.order import Order, Product, ProductFile
 from services.coupon_creater import Coupon, CouponCreater
+from services.email_sender import EmailSMTP
 from utils.config import AppSettings
 from utils.http import HEADERS
 
@@ -207,19 +207,20 @@ class OrdersHandler:
         try:
             email_settings = self.settings.email_settings
 
-            yag = SMTP(
+            with EmailSMTP(
                 user={email_settings.sender: email_settings.display_name},
+                smtp_login=email_settings.smtp_login,
                 password=email_settings.password,
                 smtp_ssl=True,
                 host=email_settings.smtp_server,
                 port=int(email_settings.smtp_port),
-            )
-            yag.send(
-                to=to_email,
-                subject=subject,
-                contents=contents,
-                attachments=attachments,
-            )
+            ) as yag:
+                yag.send(
+                    to=to_email,
+                    subject=subject,
+                    contents=contents,
+                    attachments=attachments,
+                )
             return True
 
         except EMAIL_SENDING_ERRORS as ex:
