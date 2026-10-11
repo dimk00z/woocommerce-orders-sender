@@ -3,6 +3,8 @@ from typing import List
 
 from pydantic import BaseSettings
 
+from utils.email_config import EmailSettings
+
 
 class TelegramSettrings(BaseSettings):
     bot_token: str
@@ -26,21 +28,6 @@ class WoocommerceSettings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         env_prefix = "WC_"
-
-
-class EmailSettings(BaseSettings):
-    sender: str
-    password: str
-    display_name: str
-    smtp_server: str = "smtp.yandex.ru"
-    smtp_port: int = 465
-    smtp_login: str = ""
-    max_attachment_size: int = 20 * 1024 * 1024  # 20MB
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        env_prefix = "EMAIL_"
 
 
 class AppSettings(BaseSettings):

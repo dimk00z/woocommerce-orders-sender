@@ -14,8 +14,10 @@ app_logger = logging.getLogger("app_logger")
 def main():
     try:
         logging.config.dictConfig(logger_config)
+        app_logger.info("Запуск обработки заказов")
 
         app_settings: AppSettings = get_settings()
+        app_logger.info("Настройки загружены; режим отладки: %s", app_settings.debug)
         orders_fetcher: WoocommerceFetcher = WoocommerceFetcher(
             app_logger=app_logger,
             woocommerce_settings=app_settings.woocommerce_settings,
@@ -24,6 +26,7 @@ def main():
         orders: List[Order] = orders_fetcher.fetch_orders()
 
         if not orders:
+            app_logger.info("Нет заказов для обработки; работа завершена")
             return
 
         orders_handler: OrdersHandler = OrdersHandler(
@@ -34,8 +37,9 @@ def main():
             app_logger=app_logger, settings=app_settings.telegram_settings
         )
         telegram_noticifier.send_result_to_telegram(message=result_message)
+        app_logger.info("Работа завершена")
     except Exception as ex:
-        app_logger.exception("Everything is bad: %s", ex)
+        app_logger.exception("Обработка прервана из-за ошибки: %s", ex)
 
 
 if __name__ == "__main__":

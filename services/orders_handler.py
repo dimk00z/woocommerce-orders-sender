@@ -1,6 +1,7 @@
 import logging
 from http import HTTPStatus
 from smtplib import (
+    SMTPException,
     SMTPAuthenticationError,
     SMTPDataError,
     SMTPSenderRefused,
@@ -21,6 +22,8 @@ from utils.config import AppSettings
 from utils.http import HEADERS
 
 EMAIL_SENDING_ERRORS = (
+    OSError,
+    SMTPException,
     YagInvalidEmailAddress,
     YagConnectionClosed,
     SMTPAuthenticationError,
@@ -98,15 +101,23 @@ class OrdersHandler:
         email_lines: List[str],
     ):
         if order.total <= 0 or self._check_products_for_discount(order):
+            self.app_logger.debug("Заказ №%s: купон не требуется", order.id)
             return
 
+        self.app_logger.info("Заказ №%s: подготовка купона", order.id)
         coupon: Coupon | None = CouponCreater(
             total=order.total,
             name=order.first_name,
             settings=self.settings.woocommerce_settings,
         )()
         if coupon is None:
+            self.app_logger.debug(
+                "Заказ №%s: купон не предусмотрен для этой суммы", order.id
+            )
             return
+        self.app_logger.info(
+            "Заказ №%s: купон создан, скидка %s%%", order.id, coupon.discount_percent
+        )
 
         email_lines.append(
             "".join(
@@ -154,6 +165,11 @@ class OrdersHandler:
             bool: _description_
         """
         order_info: Dict[str, str] = self._get_order_info(order=order)
+        self.app_logger.info(
+            "Заказ №%s: подготовка письма, вложений %d",
+            order.id,
+            len(order.total_files),
+        )
         with open("email_template.html", "rb") as f:
             html = f.read().decode("UTF-8")
         template: Template = Template(html)
@@ -174,7 +190,16 @@ class OrdersHandler:
             max_attachment_size=self.settings.email_settings.max_attachment_size,
         )
         results: List[bool] = []
+        self.app_logger.info(
+            "Заказ №%s: вложения разделены на %d писем", order.id, len(splitted_files)
+        )
         for pack_index, file_pack in enumerate(splitted_files):
+            self.app_logger.info(
+                "Заказ №%s: отправка части %d/%d",
+                order.id,
+                pack_index + 1,
+                len(splitted_files),
+            )
             results.append(
                 self._send_email(
                     to_email=order.email,
@@ -206,6 +231,14 @@ class OrdersHandler:
         """
         try:
             email_settings = self.settings.email_settings
+            self.app_logger.info(
+                "Отправка письма %r: получатель %s, вложений %d, SMTP %s:%s",
+                subject,
+                to_email,
+                len(attachments),
+                email_settings.smtp_server,
+                email_settings.smtp_port,
+            )
 
             with EmailSMTP(
                 user={email_settings.sender: email_settings.display_name},
@@ -215,16 +248,28 @@ class OrdersHandler:
                 host=email_settings.smtp_server,
                 port=int(email_settings.smtp_port),
             ) as yag:
-                yag.send(
+                result = yag.send(
                     to=to_email,
                     subject=subject,
                     contents=contents,
                     attachments=attachments,
                 )
+            if result is False or result:
+                self.app_logger.error(
+                    "Письмо %r для %s не отправлено: SMTP вернул неуспешный результат",
+                    subject,
+                    to_email,
+                )
+                return False
+            self.app_logger.info(
+                "Письмо %r для %s принято SMTP-сервером", subject, to_email
+            )
             return True
 
         except EMAIL_SENDING_ERRORS as ex:
-            self.app_logger.exception(f"Everything is bad:{ex}")
+            self.app_logger.exception(
+                "Ошибка отправки письма %r для %s: %s", subject, to_email, ex
+            )
             return False
 
     def _handle_order(self, *, order: Order) -> bool:
@@ -238,8 +283,12 @@ class OrdersHandler:
         """
 
         if self._send_order_email(order=order):
+            self.app_logger.info("Заказ №%s: все письма отправлены", order.id)
             return self._close_order(order=order)
 
+        self.app_logger.error(
+            "Заказ №%s: отправка писем не завершена; статус не изменён", order.id
+        )
         return False
 
     def _close_order(self, *, order: Order) -> bool:
@@ -249,6 +298,7 @@ class OrdersHandler:
             order (Order): _description_
         """
         try:
+            self.app_logger.info("Заказ №%s: изменение статуса на completed", order.id)
             put_url = f"{self.settings.woocommerce_settings.url}/orders/{order.id}"
             session = requests.Session()
             session.headers = HEADERS
@@ -256,9 +306,15 @@ class OrdersHandler:
                 put_url, auth=self.auth_pair, params={"status": "completed"}
             )
             if r.status_code == HTTPStatus.OK:
+                self.app_logger.info("Заказ №%s: статус изменён на completed", order.id)
                 return True
+            self.app_logger.error(
+                "Заказ №%s: письмо отправлено, но статус не изменён; HTTP %s",
+                order.id,
+                r.status_code,
+            )
         except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
-            self.app_logger.exception("Something bad:")
+            self.app_logger.exception("Заказ №%s: ошибка изменения статуса", order.id)
 
         return False
 
@@ -292,9 +348,33 @@ class OrdersHandler:
         return "\n".join(message_lines)
 
     def handle(self, *, timeout=45) -> str:
+        self.app_logger.info("Начало обработки %d заказов", len(self.orders))
         for order_index, order in enumerate(self.orders):
-            self.orders[order_index].status = self._handle_order(order=order)
+            self.app_logger.info(
+                "Заказ №%s (%d/%d): начало обработки",
+                order.id,
+                order_index + 1,
+                len(self.orders),
+            )
+            try:
+                self.orders[order_index].status = self._handle_order(order=order)
+            except Exception:
+                self.orders[order_index].status = False
+                self.app_logger.exception("Заказ №%s: ошибка обработки", order.id)
+            self.app_logger.info(
+                "Заказ №%s: результат обработки — %s",
+                order.id,
+                "успешно" if order.status else "ошибка",
+            )
             if order_index + 1 == len(self.orders):
                 break
+            self.app_logger.debug("Пауза перед следующим заказом: %s секунд", timeout)
             sleep(timeout)
+        successful = sum(order.status for order in self.orders)
+        self.app_logger.info(
+            "Обработка завершена: всего %d, успешно %d, с ошибками %d",
+            len(self.orders),
+            successful,
+            len(self.orders) - successful,
+        )
         return self._create_result_message()

@@ -52,6 +52,7 @@ class WoocommerceFetcher:
         """
         orders: List[Order] = []
         for order_info in wc_processing_orders:
+            self.logger.info("Подготовка заказа №%s", order_info["id"])
             order: Order = Order(
                 id=order_info["id"],
                 total=order_info["total"],
@@ -62,6 +63,9 @@ class WoocommerceFetcher:
             total_files: Set[str] = set()
             for product in order_info["line_items"]:
                 product_url = f'{self.url}/products/{product["product_id"]}'
+                self.logger.debug(
+                    "Заказ №%s: загрузка товара №%s", order.id, product["product_id"]
+                )
                 product_info = self._fetch_wc_url(url=product_url)
                 fetched_product: Product = Product(
                     name=self._sanitaze_order_name(order_name=product["name"]),
@@ -81,6 +85,13 @@ class WoocommerceFetcher:
                 for file_name in total_files
             ]
             orders.append(order)
+            self.logger.info(
+                "Заказ №%s подготовлен: товаров %d, файлов %d, размер %d байт",
+                order.id,
+                len(order.products),
+                len(order.total_files),
+                sum(file.file_size for file in order.total_files),
+            )
         return orders
 
     def _fetch_wc_url(self, *, url, params={}):
@@ -94,10 +105,12 @@ class WoocommerceFetcher:
             _type_: _description_
         """
         try:
+            self.logger.debug("Запрос WooCommerce: %s", url)
             session = requests.Session()
             session.headers = HEADERS
             r = session.get(url, auth=self.auth_pair, params=params)
             r.raise_for_status()
+            self.logger.debug("Ответ WooCommerce: HTTP %s", r.status_code)
 
             if r is None:
                 raise HTTPError
@@ -108,7 +121,7 @@ class WoocommerceFetcher:
             requests.exceptions.Timeout,
             HTTPError,
         ) as error:
-            self.logger.exception(f"Something bad: {error}")
+            self.logger.exception("Ошибка запроса WooCommerce %s: %s", url, error)
             return None
 
     def fetch_orders(self) -> List[Order]:
@@ -118,11 +131,18 @@ class WoocommerceFetcher:
             List[Order]: _description_
         """
         orders: List[Order] = []
+        self.logger.info("Загрузка заказов WooCommerce со статусом processing")
         orders_url = f"{self.url}/orders"
         params = {"status": "processing"}
         response = self._fetch_wc_url(url=orders_url, params=params)
+        if response is None:
+            self.logger.error("Не удалось загрузить заказы WooCommerce")
+            raise RuntimeError("Загрузка заказов WooCommerce не выполнена")
+        self.logger.info("Загружено заказов: %d", len(response))
         if response:
             orders = self._parse_orders(wc_processing_orders=response)
         if self.debug:
             orders = [order for order in orders if order.email == self.debug_email]
+            self.logger.info("После фильтра отладки осталось заказов: %d", len(orders))
+        self.logger.info("Готово к обработке заказов: %d", len(orders))
         return orders

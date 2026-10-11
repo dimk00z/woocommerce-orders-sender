@@ -15,8 +15,7 @@ from utils.config import TelegramSettrings
 def format_telegram_send_error(ex: BaseException) -> str:
     """Short safe error text (no bot token / full request URL)."""
     if isinstance(ex, MaxRetryError) or (
-        isinstance(ex, RequestsConnectionError)
-        and "Max retries exceeded" in str(ex)
+        isinstance(ex, RequestsConnectionError) and "Max retries exceeded" in str(ex)
     ):
         cause = ex.args[0] if ex.args else None
         reason = getattr(cause, "reason", None) or cause or ex
@@ -64,25 +63,31 @@ class TelegramNoticifier:
         try:
             for user_id in self.settings.users_id:
                 self.bot.send_message(chat_id=user_id, text=message)
-            print(f"Telegram message sent via proxy={proxy_url or 'direct'}")
+            self.app_logger.info(
+                "Отчёт Telegram отправлен, подключение: %s",
+                "прокси" if proxy_url else "напрямую",
+            )
             if proxy_url:
                 self.proxy_loader.save_last_success(proxy_url)
             return True
         except (RequestsConnectionError, MaxRetryError, SSLError, Timeout) as ex:
-            print(
-                f"Telegram send failed via proxy={proxy_url or 'direct'}: "
-                f"{format_telegram_send_error(ex)}"
+            self.app_logger.warning(
+                "Не удалось отправить отчёт Telegram (%s): %s",
+                "прокси" if proxy_url else "напрямую",
+                format_telegram_send_error(ex),
             )
             return False
         except Exception as ex:
-            print(
-                f"Telegram send failed via proxy={proxy_url or 'direct'}: "
-                f"{format_telegram_send_error(ex)}"
+            self.app_logger.warning(
+                "Не удалось отправить отчёт Telegram (%s): %s",
+                "прокси" if proxy_url else "напрямую",
+                format_telegram_send_error(ex),
             )
             return False
 
     def send_result_to_telegram(self, *, message: str):
         """Send message for users, trying proxies until one works."""
+        self.app_logger.info("Отправка итогового отчёта в Telegram")
         for proxy_url in self.proxy_loader.candidates(
             configured=self.settings.proxy,
             limit=self.MAX_PROXY_ATTEMPTS,
@@ -90,4 +95,7 @@ class TelegramNoticifier:
             if self._send_with_proxy(message=message, proxy_url=proxy_url):
                 return
 
-        print("Failed to send telegram message via all proxies")
+        # The Telegram logging handler would repeat the same failed network calls.
+        self.app_logger.warning(
+            "Отчёт Telegram не отправлен: все варианты подключения исчерпаны"
+        )

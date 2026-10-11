@@ -1,4 +1,5 @@
 import os
+import logging
 import tempfile
 import unittest
 from contextlib import ExitStack
@@ -8,6 +9,7 @@ from email.parser import Parser
 from email.utils import parseaddr
 from pathlib import Path
 from smtplib import SMTPAuthenticationError
+from smtplib import SMTPServerDisconnected
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -26,8 +28,10 @@ with patch.dict(
         "EMAIL_DISPLAY_NAME": "Магазин",
     },
     clear=True,
-):
+), patch("pydantic.env_settings.read_env_file", return_value={}):
+    from models.order import Order
     from services.orders_handler import OrdersHandler
+    from services.woocommerce_fetcher import WoocommerceFetcher
     from utils.config import EmailSettings
 
 
@@ -124,6 +128,96 @@ class EmailSendingTests(unittest.TestCase):
         self.assertFalse(self.send(self.settings()))
         self.connection.sendmail.assert_not_called()
         self.connection.quit.assert_called_once()
+
+    def test_disconnected_server_returns_failure_after_retries(self):
+        self.connection.sendmail.side_effect = SMTPServerDisconnected("Disconnected")
+        with patch("yagmail.sender.time.sleep"):
+            with self.assertLogs("yagmail", level="ERROR"):
+                self.assertFalse(self.send(self.settings()))
+
+    def test_refused_recipient_returns_failure(self):
+        self.connection.sendmail.return_value = {"buyer@example.com": (550, b"Refused")}
+        self.assertFalse(self.send(self.settings()))
+
+
+class OrderPipelineTests(unittest.TestCase):
+    def order(self, order_id):
+        return Order(
+            id=order_id,
+            total=0,
+            email="buyer@example.com",
+            first_name="Test",
+            last_name="Buyer",
+        )
+
+    def handler(self, orders):
+        return OrdersHandler(
+            orders=orders,
+            settings=SimpleNamespace(
+                woocommerce_settings=SimpleNamespace(
+                    user_key="key", secret_key="secret"
+                )
+            ),
+            app_logger=logging.getLogger("test_orders"),
+        )
+
+    def test_order_error_is_logged_and_next_order_is_processed(self):
+        orders = [self.order("101"), self.order("102")]
+        handler = self.handler(orders)
+        with patch.object(
+            handler,
+            "_send_order_email",
+            side_effect=[FileNotFoundError("missing attachment"), True],
+        ), patch.object(handler, "_close_order", return_value=True) as close:
+            with self.assertLogs("test_orders", level="INFO") as logs:
+                handler.handle(timeout=0)
+        self.assertFalse(orders[0].status)
+        self.assertTrue(orders[1].status)
+        close.assert_called_once_with(order=orders[1])
+        errors = [record for record in logs.records if record.levelno == logging.ERROR]
+        self.assertTrue(
+            any("101" in record.getMessage() and record.exc_info for record in errors)
+        )
+        self.assertIn("всего 2, успешно 1, с ошибками 1", logs.records[-1].getMessage())
+
+    def test_sent_email_and_failed_status_are_reported_separately(self):
+        order = self.order("103")
+        handler = self.handler([order])
+        handler.settings.woocommerce_settings.url = "https://example.com"
+        with patch.object(handler, "_send_order_email", return_value=True), patch(
+            "services.orders_handler.requests.Session"
+        ) as session:
+            session.return_value.put.return_value.status_code = 500
+            with self.assertLogs("test_orders", level="INFO") as logs:
+                handler.handle(timeout=0)
+        self.assertFalse(order.status)
+        self.assertTrue(
+            any(
+                "все письма отправлены" in record.getMessage()
+                for record in logs.records
+            )
+        )
+        self.assertTrue(
+            any(
+                record.levelno == logging.ERROR and "HTTP 500" in record.getMessage()
+                for record in logs.records
+            )
+        )
+
+    def test_fetch_error_is_not_reported_as_empty_queue(self):
+        fetcher = WoocommerceFetcher(
+            woocommerce_settings=SimpleNamespace(
+                user_key="key",
+                secret_key="secret",
+                url="https://example.com",
+                redundant_phrase="",
+            ),
+            app_logger=logging.getLogger("test_fetch"),
+        )
+        with patch.object(fetcher, "_fetch_wc_url", return_value=None):
+            with self.assertLogs("test_fetch", level="ERROR"):
+                with self.assertRaises(RuntimeError):
+                    fetcher.fetch_orders()
 
 
 if __name__ == "__main__":
