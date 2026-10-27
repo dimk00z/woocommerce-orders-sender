@@ -67,9 +67,7 @@ class ProxyLoader:
             response = requests.get(self.URL, timeout=30)
             response.raise_for_status()
             proxies = [Proxy.parse_obj(item) for item in response.json()]
-            proxies = [
-                p for p in proxies if p.protocol in self.PROTOCOL_PRIORITY
-            ]
+            proxies = [p for p in proxies if p.protocol in self.PROTOCOL_PRIORITY]
             proxies.sort(
                 key=lambda p: (
                     self.PROTOCOL_PRIORITY[p.protocol],

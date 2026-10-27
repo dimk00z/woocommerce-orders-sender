@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 from http import HTTPStatus
 from smtplib import (
     SMTPException,
@@ -17,9 +18,10 @@ from yagmail.error import YagAddressError, YagConnectionClosed, YagInvalidEmailA
 
 from models.order import Order, Product, ProductFile
 from services.coupon_creater import Coupon, CouponCreater
-from services.email_sender import EmailSMTP
+from services.email_sender import EmailSMTP, describe_smtp_error
 from utils.config import AppSettings
 from utils.http import HEADERS
+from utils.log_context import current_run_id, redact
 
 EMAIL_SENDING_ERRORS = (
     OSError,
@@ -36,6 +38,14 @@ EMAIL_SENDING_ERRORS = (
 PRODUCTS_WITHOUT_COUPON: List[str] = [
     "оплата занятий",
 ]
+
+
+@dataclass
+class EmailOutcome:
+    part: int
+    total: int
+    accepted: bool
+    details: str
 
 
 class OrdersHandler:
@@ -60,6 +70,10 @@ class OrdersHandler:
             settings.woocommerce_settings.secret_key,
         )
         self.email_template = email_template
+        self.run_id = current_run_id()
+        self.email_results: Dict[str, List[EmailOutcome]] = {}
+        self.order_errors: Dict[str, str] = {}
+        self.order_status_results: Dict[str, str] = {}
 
     def _get_order_info(self, *, order: Order) -> Dict[str, str]:
         email_lines: List[str] = ['<p><b color="blue">Состав заказа:</b></p><ul>']
@@ -183,6 +197,8 @@ class OrdersHandler:
                 subject=f"Заказ №{order.id}",
                 contents=[template.render(**order_info)],
                 attachments=[file.file_name for file in order.total_files],
+                order_id=order.id,
+                attachment_bytes=sum(file.file_size for file in order.total_files),
             )
         # Splitted logic
         splitted_files: List[List[str]] = OrdersHandler._split_files(
@@ -203,9 +219,17 @@ class OrdersHandler:
             results.append(
                 self._send_email(
                     to_email=order.email,
-                    subject=f"Заказ №{order.id} - часть {pack_index+1}",
+                    subject=f"Заказ №{order.id} - часть {pack_index + 1}",
                     contents=[template.render(**order_info)],
                     attachments=file_pack,
+                    order_id=order.id,
+                    part_number=pack_index + 1,
+                    parts_count=len(splitted_files),
+                    attachment_bytes=sum(
+                        file.file_size
+                        for file in order.total_files
+                        if file.file_name in file_pack
+                    ),
                 )
             )
         return all(results)
@@ -217,6 +241,10 @@ class OrdersHandler:
         subject: str,
         attachments: List[str],
         contents,
+        order_id: str = None,
+        part_number: int = 1,
+        parts_count: int = 1,
+        attachment_bytes: int = 0,
     ) -> bool:
         """Send email with yagmail
 
@@ -229,13 +257,29 @@ class OrdersHandler:
         Returns:
             bool: _description_
         """
+        context = (
+            f"Заказ №{order_id}, часть {part_number}/{parts_count}"
+            if order_id is not None
+            else f"Письмо {subject!r}"
+        )
+
+        def finish(accepted: bool, details: str) -> bool:
+            details = redact(details)
+            if order_id is not None:
+                self.email_results.setdefault(order_id, []).append(
+                    EmailOutcome(part_number, parts_count, accepted, details)
+                )
+            return accepted
+
+        yag = None
         try:
             email_settings = self.settings.email_settings
             self.app_logger.info(
-                "Отправка письма %r: получатель %s, вложений %d, SMTP %s:%s",
-                subject,
+                "%s: получатель %s, вложений %d, размер %d байт, SMTP %s:%s",
+                context,
                 to_email,
                 len(attachments),
+                attachment_bytes,
                 email_settings.smtp_server,
                 email_settings.smtp_port,
             )
@@ -243,6 +287,8 @@ class OrdersHandler:
             with EmailSMTP(
                 user={email_settings.sender: email_settings.display_name},
                 smtp_login=email_settings.smtp_login,
+                diagnostic_logger=self.app_logger,
+                context=context,
                 password=email_settings.password,
                 smtp_ssl=True,
                 host=email_settings.smtp_server,
@@ -255,22 +301,37 @@ class OrdersHandler:
                     attachments=attachments,
                 )
             if result is False or result:
-                self.app_logger.error(
-                    "Письмо %r для %s не отправлено: SMTP вернул неуспешный результат",
-                    subject,
-                    to_email,
+                reason = (
+                    yag.last_error
+                    or "SMTP вернул неуспешный результат; приём письма не подтверждён"
                 )
-                return False
+                self.app_logger.error(
+                    "%s для %s: %s",
+                    context,
+                    to_email,
+                    reason,
+                )
+                return finish(False, reason)
             self.app_logger.info(
                 "Письмо %r для %s принято SMTP-сервером", subject, to_email
             )
-            return True
+            return finish(True, "принято SMTP-сервером")
 
         except EMAIL_SENDING_ERRORS as ex:
-            self.app_logger.exception(
-                "Ошибка отправки письма %r для %s: %s", subject, to_email, ex
+            reason = (
+                yag.last_error
+                if yag and yag.last_error
+                else (
+                    f"этап {yag.stage if yag else 'подготовка SMTP'}: {describe_smtp_error(ex)}"
+                )
             )
-            return False
+            self.app_logger.exception(
+                "%s для %s: %s",
+                context,
+                to_email,
+                reason,
+            )
+            return finish(False, reason)
 
     def _handle_order(self, *, order: Order) -> bool:
         """Send email and change status if email is ok
@@ -287,7 +348,8 @@ class OrdersHandler:
             return self._close_order(order=order)
 
         self.app_logger.error(
-            "Заказ №%s: отправка писем не завершена; статус не изменён", order.id
+            "Заказ №%s: отправка писем не завершена; изменение статуса WooCommerce не запрашивалось",
+            order.id,
         )
         return False
 
@@ -302,6 +364,9 @@ class OrdersHandler:
             put_url = f"{self.settings.woocommerce_settings.url}/orders/{order.id}"
             session = requests.Session()
             session.headers = HEADERS
+            self.order_status_results[
+                order.id
+            ] = "изменение статуса WooCommerce запрошено, но результат не подтверждён"
             r = session.put(
                 put_url, auth=self.auth_pair, params={"status": "completed"}
             )
@@ -309,11 +374,20 @@ class OrdersHandler:
                 self.app_logger.info("Заказ №%s: статус изменён на completed", order.id)
                 return True
             self.app_logger.error(
-                "Заказ №%s: письмо отправлено, но статус не изменён; HTTP %s",
+                "Заказ №%s: письмо принято SMTP, изменение статуса не подтверждено; HTTP %s",
                 order.id,
                 r.status_code,
             )
-        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+            self.order_errors[
+                order.id
+            ] = f"Письма приняты SMTP, изменение статуса WooCommerce не подтверждено: HTTP {r.status_code}"
+        except (
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+        ) as error:
+            self.order_errors[
+                order.id
+            ] = f"Письма приняты SMTP, ошибка изменения статуса: {type(error).__name__}: {error}"
             self.app_logger.exception("Заказ №%s: ошибка изменения статуса", order.id)
 
         return False
@@ -324,27 +398,44 @@ class OrdersHandler:
         Returns:
             str: _description_
         """
-        message_lines: List[str] = []
+        message_lines: List[str] = [f"Итог запуска {self.run_id}"]
         total: float = 0.0
         bad_orders = []
         for order in self.orders:
             if order.status is False:
                 bad_orders.append(order)
-                continue
-            products = "\n".join([f" · {product.name}" for product in order.products])
-            message_lines.append(
-                f"№ {order.id} - {order.first_name} {order.last_name}, {order.email}\n{products}\n{order.total} руб."
-            )
-            total += order.total
-        if len(self.orders) > 1:
-            message_lines.append(f"Всего {len(self.orders)} заказов на {total} руб.")
-        if bad_orders:
-            message_lines.append("Ошибки:")
-            message_lines.append(
-                ", ".join(
-                    [f"{bad_order.id} - {bad_order.email}" for bad_order in bad_orders]
+            else:
+                products = "\n".join(
+                    [f" · {product.name}" for product in order.products]
+                )
+                message_lines.append(
+                    f"№ {order.id} - {order.first_name} {order.last_name}, {order.email}\n{products}\n{order.total} руб."
+                )
+                total += order.total
+            if not order.status:
+                message_lines.append(f"Ошибка заказа №{order.id} — {order.email}")
+            for result in self.email_results.get(order.id, []):
+                message_lines.append(
+                    f"Заказ №{order.id}, часть {result.part}/{result.total}: {result.details}"
+                )
+            status_result = (
+                "все письма приняты SMTP; статус WooCommerce подтверждён: completed"
+                if order.status
+                else self.order_status_results.get(
+                    order.id, "изменение статуса WooCommerce не запрашивалось"
                 )
             )
+            message_lines.append(f"Заказ №{order.id}: {status_result}")
+            if order.id in self.order_errors:
+                message_lines.append(redact(self.order_errors[order.id]))
+            elif not order.status and not self.email_results.get(order.id):
+                message_lines.append(
+                    "Обработка не завершена; подробности в логах заказа"
+                )
+        message_lines.append(
+            f"Всего {len(self.orders)}, успешно {len(self.orders) - len(bad_orders)}, "
+            f"с ошибками {len(bad_orders)}. Сумма успешных заказов: {total} руб."
+        )
         return "\n".join(message_lines)
 
     def handle(self, *, timeout=45) -> str:
@@ -358,8 +449,11 @@ class OrdersHandler:
             )
             try:
                 self.orders[order_index].status = self._handle_order(order=order)
-            except Exception:
+            except Exception as error:
                 self.orders[order_index].status = False
+                self.order_errors[order.id] = redact(
+                    f"Ошибка обработки: {type(error).__name__}: {error}"
+                )
                 self.app_logger.exception("Заказ №%s: ошибка обработки", order.id)
             self.app_logger.info(
                 "Заказ №%s: результат обработки — %s",

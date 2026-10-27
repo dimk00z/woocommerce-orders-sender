@@ -62,7 +62,7 @@ class WoocommerceFetcher:
             )
             total_files: Set[str] = set()
             for product in order_info["line_items"]:
-                product_url = f'{self.url}/products/{product["product_id"]}'
+                product_url = f"{self.url}/products/{product['product_id']}"
                 self.logger.debug(
                     "Заказ №%s: загрузка товара №%s", order.id, product["product_id"]
                 )

@@ -7,6 +7,7 @@ from pydantic import Field, ValidationError
 
 from services.email_sender import EmailSMTP
 from utils.email_config import EmailSettings
+from utils.log_context import RunContextFilter, SafeFormatter, start_run
 
 logger = logging.getLogger("send_test_email")
 
@@ -23,9 +24,17 @@ def main(argv: list[str] | None = None) -> int:
         "recipient", nargs="?", help="Адрес получателя (по умолчанию TEST_EMAIL)."
     )
     args = parser.parse_args(argv)
+    start_run()
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
     )
+    for handler in logging.getLogger().handlers:
+        handler.addFilter(RunContextFilter())
+        handler.setFormatter(
+            SafeFormatter(
+                "%(asctime)s - %(levelname)s - запуск %(run_id)s, PID %(process)d - %(message)s"
+            )
+        )
 
     try:
         settings = TestEmailSettings()
@@ -58,6 +67,8 @@ def main(argv: list[str] | None = None) -> int:
             port=settings.smtp_port,
             smtp_ssl=True,
             timeout=30,
+            diagnostic_logger=logger,
+            context=f"Тестовое письмо для {recipient}",
         ) as smtp:
             result = smtp.send(
                 to=recipient,

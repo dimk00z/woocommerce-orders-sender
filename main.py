@@ -1,11 +1,11 @@
 import logging.config
-from typing import List
 
 from models.order import Order
 from services.orders_handler import OrdersHandler
 from services.telegram_noticifier import TelegramNoticifier
 from services.woocommerce_fetcher import WoocommerceFetcher
 from utils.config import AppSettings, get_settings
+from utils.log_context import start_run
 from utils.logger import logger_config
 
 app_logger = logging.getLogger("app_logger")
@@ -13,6 +13,7 @@ app_logger = logging.getLogger("app_logger")
 
 def main():
     try:
+        start_run()
         logging.config.dictConfig(logger_config)
         app_logger.info("Запуск обработки заказов")
 
@@ -23,7 +24,7 @@ def main():
             woocommerce_settings=app_settings.woocommerce_settings,
             debug=app_settings.debug,
         )
-        orders: List[Order] = orders_fetcher.fetch_orders()
+        orders: list[Order] = orders_fetcher.fetch_orders()
 
         if not orders:
             app_logger.info("Нет заказов для обработки; работа завершена")

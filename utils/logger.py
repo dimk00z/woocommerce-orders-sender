@@ -7,6 +7,13 @@ from telebot import apihelper
 
 from services.proxy_loader import ProxyLoader
 from utils.config import TelegramSettrings, get_settings
+from utils.log_context import (
+    RunContextFilter,
+    SafeFormatter,
+    TelegramLogFilter,
+    register_log_secret,
+)
+from utils.telegram_text import split_telegram_text
 
 
 class TelegramHandler(logging.Handler):
@@ -17,6 +24,7 @@ class TelegramHandler(logging.Handler):
     def __init__(self, telegram_bot_token, telegram_users, telegram_proxy: str = ""):
         logging.Handler.__init__(self)
         self.telegram_bot_token = telegram_bot_token
+        register_log_secret(telegram_bot_token)
         self.telegram_users = telegram_users
         self.telegram_proxy = telegram_proxy
         self.bot = telebot.TeleBot(telegram_bot_token)
@@ -40,41 +48,67 @@ class TelegramHandler(logging.Handler):
         )
         return self._candidates
 
-    def _send_with_proxy(self, *, message: str, proxy_url: Optional[str]) -> bool:
+    def _send_with_proxy(
+        self, *, message: str, proxy_url: Optional[str], delivered=None
+    ) -> bool:
+        if delivered is None:
+            delivered = set()
         self._set_proxy(proxy_url or None)
         try:
             for user in self.telegram_users:
                 if user:
-                    self.bot.send_message(user, message)
+                    for index, part in enumerate(split_telegram_text(message)):
+                        if (user, index) not in delivered:
+                            self.bot.send_message(user, part)
+                            delivered.add((user, index))
             if proxy_url:
                 self._proxy_loader.save_last_success(proxy_url)
             return True
-        except Exception:
+        except Exception as error:
+            from services.telegram_noticifier import format_telegram_send_error
+
+            logging.getLogger("app_logger").warning(
+                "Не удалось передать лог в Telegram: %s",
+                format_telegram_send_error(error),
+                extra={"console_only": True},
+            )
             return False
 
     def emit(self, record):
         try:
             message = self.format(record)
+            delivered = set()
             for proxy_url in self._proxy_candidates():
-                if self._send_with_proxy(message=message, proxy_url=proxy_url):
+                if self._send_with_proxy(
+                    message=message, proxy_url=proxy_url, delivered=delivered
+                ):
                     return
+            logging.getLogger("app_logger").warning(
+                "Лог Telegram не доставлен: все варианты подключения исчерпаны",
+                extra={"console_only": True},
+            )
         except Exception:
             self.handleError(record)
 
 
-format_string = (
-    "{asctime} - {levelname} - {name} - {module}:{funcName}:{lineno}- {message}"
-)
+format_string = "{asctime} - {levelname} - запуск {run_id}, PID {process} - {module}:{funcName}:{lineno} - {message}"
 
 telegram_params: TelegramSettrings = get_settings().telegram_settings
 logger_config = {
     "version": 1,
     "disable_existing_loggers": False,
-    "formatters": {"std_formatter": {"format": format_string, "style": "{"}},
+    "formatters": {
+        "std_formatter": {"()": SafeFormatter, "format": format_string, "style": "{"}
+    },
+    "filters": {
+        "run_context": {"()": RunContextFilter},
+        "telegram_context": {"()": TelegramLogFilter},
+    },
     "handlers": {
         "telegram_handler": {
             "()": TelegramHandler,
-            "level": "ERROR",
+            "level": "INFO",
+            "filters": ["telegram_context"],
             "formatter": "std_formatter",
             "telegram_bot_token": telegram_params.bot_token,
             "telegram_users": telegram_params.users_id,
@@ -83,6 +117,7 @@ logger_config = {
         "console_stdout": {
             "class": "logging.StreamHandler",
             "level": "DEBUG",
+            "filters": ["run_context"],
             "formatter": "std_formatter",
             "stream": sys.stdout,
         },

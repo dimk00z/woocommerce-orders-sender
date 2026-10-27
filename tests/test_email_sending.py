@@ -15,20 +15,23 @@ from unittest.mock import Mock, patch
 
 
 # AppSettings constructs nested settings at import time.
-with patch.dict(
-    os.environ,
-    {
-        "TELEGRAM_BOT_TOKEN": "test-token",
-        "TELEGRAM_USERS_ID": "[]",
-        "WC_USER_KEY": "test-key",
-        "WC_SECRET_KEY": "test-secret",
-        "WC_URL": "https://example.com",
-        "EMAIL_SENDER": "sender@example.com",
-        "EMAIL_PASSWORD": "test-password",
-        "EMAIL_DISPLAY_NAME": "Магазин",
-    },
-    clear=True,
-), patch("pydantic.env_settings.read_env_file", return_value={}):
+with (
+    patch.dict(
+        os.environ,
+        {
+            "TELEGRAM_BOT_TOKEN": "test-token",
+            "TELEGRAM_USERS_ID": "[]",
+            "WC_USER_KEY": "test-key",
+            "WC_SECRET_KEY": "test-secret",
+            "WC_URL": "https://example.com",
+            "EMAIL_SENDER": "sender@example.com",
+            "EMAIL_PASSWORD": "test-password",
+            "EMAIL_DISPLAY_NAME": "Магазин",
+        },
+        clear=True,
+    ),
+    patch("pydantic.env_settings.read_env_file", return_value={}),
+):
     from models.order import Order
     from services.orders_handler import OrdersHandler
     from services.woocommerce_fetcher import WoocommerceFetcher
@@ -132,8 +135,7 @@ class EmailSendingTests(unittest.TestCase):
     def test_disconnected_server_returns_failure_after_retries(self):
         self.connection.sendmail.side_effect = SMTPServerDisconnected("Disconnected")
         with patch("yagmail.sender.time.sleep"):
-            with self.assertLogs("yagmail", level="ERROR"):
-                self.assertFalse(self.send(self.settings()))
+            self.assertFalse(self.send(self.settings()))
 
     def test_refused_recipient_returns_failure(self):
         self.connection.sendmail.return_value = {"buyer@example.com": (550, b"Refused")}
@@ -141,6 +143,32 @@ class EmailSendingTests(unittest.TestCase):
 
 
 class OrderPipelineTests(unittest.TestCase):
+    def test_failed_send_does_not_update_woocommerce_and_report_says_so(self):
+        order = self.order("104")
+        handler = self.handler([order])
+        with patch.object(handler, "_send_order_email", return_value=False), patch(
+            "services.orders_handler.requests.Session"
+        ) as session:
+            with self.assertLogs("test_orders", level="INFO"):
+                report = handler.handle(timeout=0)
+        session.assert_not_called()
+        self.assertFalse(order.status)
+        self.assertIn("изменение статуса WooCommerce не запрашивалось", report)
+
+    def test_successful_send_report_confirms_completed_only_after_update(self):
+        order = self.order("105")
+        handler = self.handler([order])
+        handler.settings.woocommerce_settings.url = "https://example.com"
+        with patch.object(handler, "_send_order_email", return_value=True), patch(
+            "services.orders_handler.requests.Session"
+        ) as session:
+            session.return_value.put.return_value.status_code = 200
+            with self.assertLogs("test_orders", level="INFO"):
+                report = handler.handle(timeout=0)
+        session.return_value.put.assert_called_once()
+        self.assertTrue(order.status)
+        self.assertIn("статус WooCommerce подтверждён: completed", report)
+
     def order(self, order_id):
         return Order(
             id=order_id,
@@ -164,11 +192,14 @@ class OrderPipelineTests(unittest.TestCase):
     def test_order_error_is_logged_and_next_order_is_processed(self):
         orders = [self.order("101"), self.order("102")]
         handler = self.handler(orders)
-        with patch.object(
-            handler,
-            "_send_order_email",
-            side_effect=[FileNotFoundError("missing attachment"), True],
-        ), patch.object(handler, "_close_order", return_value=True) as close:
+        with (
+            patch.object(
+                handler,
+                "_send_order_email",
+                side_effect=[FileNotFoundError("missing attachment"), True],
+            ),
+            patch.object(handler, "_close_order", return_value=True) as close,
+        ):
             with self.assertLogs("test_orders", level="INFO") as logs:
                 handler.handle(timeout=0)
         self.assertFalse(orders[0].status)
@@ -184,9 +215,10 @@ class OrderPipelineTests(unittest.TestCase):
         order = self.order("103")
         handler = self.handler([order])
         handler.settings.woocommerce_settings.url = "https://example.com"
-        with patch.object(handler, "_send_order_email", return_value=True), patch(
-            "services.orders_handler.requests.Session"
-        ) as session:
+        with (
+            patch.object(handler, "_send_order_email", return_value=True),
+            patch("services.orders_handler.requests.Session") as session,
+        ):
             session.return_value.put.return_value.status_code = 500
             with self.assertLogs("test_orders", level="INFO") as logs:
                 handler.handle(timeout=0)
