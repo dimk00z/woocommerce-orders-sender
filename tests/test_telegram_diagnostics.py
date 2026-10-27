@@ -145,6 +145,86 @@ class OrderDiagnosticsTests(unittest.TestCase):
 
 
 class TelegramTransportTests(unittest.TestCase):
+    def run_order_check(self, response, error=None):
+        import main as app
+
+        handler = TelegramHandler("123:test", ["user"])
+        handler.setLevel(logger_config["handlers"]["telegram_handler"]["level"])
+        for spec in logger_config["handlers"]["telegram_handler"]["filters"]:
+            handler.addFilter(logger_config["filters"][spec]["()"]())
+        logger = logging.Logger("run_check", logging.DEBUG)
+        logger.addHandler(handler)
+        settings = SimpleNamespace(
+            debug=False,
+            woocommerce_settings=SimpleNamespace(
+                user_key="key",
+                secret_key="secret",
+                url="https://example.com",
+                redundant_phrase="",
+            ),
+            telegram_settings=SimpleNamespace(),
+        )
+        with patch.object(app.logging.config, "dictConfig"), patch.object(
+            app, "app_logger", logger
+        ), patch.object(app, "get_settings", return_value=settings), patch.object(
+            app, "OrdersHandler"
+        ) as orders_handler, patch.object(
+            app, "TelegramNoticifier"
+        ) as notifier, patch(
+            "services.woocommerce_fetcher.requests.Session"
+        ) as session, patch.object(
+            handler, "_proxy_candidates", return_value=[""]
+        ) as proxies, patch.object(
+            handler.bot, "send_message"
+        ) as send:
+            session.return_value.get.return_value.json.return_value = response
+            session.return_value.get.side_effect = error
+            app.main()
+        return send, proxies, orders_handler, notifier
+
+    def test_empty_run_does_not_contact_telegram_or_load_proxies(self):
+        send, proxies, orders_handler, notifier = self.run_order_check([])
+        send.assert_not_called()
+        proxies.assert_not_called()
+        orders_handler.assert_not_called()
+        notifier.assert_not_called()
+
+    def test_fetch_error_still_goes_to_telegram(self):
+        import requests
+
+        send, _, orders_handler, _ = self.run_order_check(
+            None, requests.ConnectionError("WooCommerce unavailable")
+        )
+        self.assertGreater(send.call_count, 0)
+        self.assertTrue(
+            any(
+                "WooCommerce unavailable" in item.args[1]
+                for item in send.call_args_list
+            )
+        )
+        orders_handler.assert_not_called()
+
+    def test_real_orders_still_send_progress_and_report(self):
+        send, _, orders_handler, notifier = self.run_order_check(
+            [
+                {
+                    "id": 123,
+                    "total": "0",
+                    "billing": {
+                        "email": "buyer@example.com",
+                        "first_name": "Test",
+                        "last_name": "Buyer",
+                    },
+                    "line_items": [],
+                }
+            ]
+        )
+        self.assertTrue(
+            any("Загружено заказов: 1" in item.args[1] for item in send.call_args_list)
+        )
+        orders_handler.return_value.handle.assert_called_once()
+        notifier.return_value.send_result_to_telegram.assert_called_once()
+
     def test_configured_formatter_includes_run_id_pid_and_traceback(self):
         from utils.log_context import RunContextFilter, start_run
 

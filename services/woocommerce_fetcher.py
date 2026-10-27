@@ -131,18 +131,19 @@ class WoocommerceFetcher:
             List[Order]: _description_
         """
         orders: List[Order] = []
-        self.logger.info("Загрузка заказов WooCommerce со статусом processing")
+        self.logger.debug("Загрузка заказов WooCommerce со статусом processing")
         orders_url = f"{self.url}/orders"
         params = {"status": "processing"}
         response = self._fetch_wc_url(url=orders_url, params=params)
         if response is None:
             self.logger.error("Не удалось загрузить заказы WooCommerce")
             raise RuntimeError("Загрузка заказов WooCommerce не выполнена")
-        self.logger.info("Загружено заказов: %d", len(response))
         if response:
+            self.logger.info("Загружено заказов: %d", len(response))
             orders = self._parse_orders(wc_processing_orders=response)
         if self.debug:
             orders = [order for order in orders if order.email == self.debug_email]
-            self.logger.info("После фильтра отладки осталось заказов: %d", len(orders))
-        self.logger.info("Готово к обработке заказов: %d", len(orders))
+            self.logger.debug("После фильтра отладки осталось заказов: %d", len(orders))
+        if orders:
+            self.logger.info("Готово к обработке заказов: %d", len(orders))
         return orders

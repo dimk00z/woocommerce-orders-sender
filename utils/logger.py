@@ -116,7 +116,7 @@ logger_config = {
         },
         "console_stdout": {
             "class": "logging.StreamHandler",
-            "level": "DEBUG",
+            "level": "INFO",
             "filters": ["run_context"],
             "formatter": "std_formatter",
             "stream": sys.stdout,

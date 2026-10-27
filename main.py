@@ -15,10 +15,10 @@ def main():
     try:
         start_run()
         logging.config.dictConfig(logger_config)
-        app_logger.info("Запуск обработки заказов")
+        app_logger.debug("Запуск обработки заказов")
 
         app_settings: AppSettings = get_settings()
-        app_logger.info("Настройки загружены; режим отладки: %s", app_settings.debug)
+        app_logger.debug("Настройки загружены; режим отладки: %s", app_settings.debug)
         orders_fetcher: WoocommerceFetcher = WoocommerceFetcher(
             app_logger=app_logger,
             woocommerce_settings=app_settings.woocommerce_settings,
@@ -27,7 +27,7 @@ def main():
         orders: list[Order] = orders_fetcher.fetch_orders()
 
         if not orders:
-            app_logger.info("Нет заказов для обработки; работа завершена")
+            app_logger.debug("Нет заказов для обработки; работа завершена")
             return
 
         orders_handler: OrdersHandler = OrdersHandler(
