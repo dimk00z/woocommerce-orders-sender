@@ -107,7 +107,7 @@ logger_config = {
     "handlers": {
         "telegram_handler": {
             "()": TelegramHandler,
-            "level": "INFO",
+            "level": "ERROR",
             "filters": ["telegram_context"],
             "formatter": "std_formatter",
             "telegram_bot_token": telegram_params.bot_token,

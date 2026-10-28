@@ -204,7 +204,7 @@ class TelegramTransportTests(unittest.TestCase):
         )
         orders_handler.assert_not_called()
 
-    def test_real_orders_still_send_progress_and_report(self):
+    def test_real_orders_send_only_report_without_progress_notifications(self):
         send, _, orders_handler, notifier = self.run_order_check(
             [
                 {
@@ -219,9 +219,7 @@ class TelegramTransportTests(unittest.TestCase):
                 }
             ]
         )
-        self.assertTrue(
-            any("Загружено заказов: 1" in item.args[1] for item in send.call_args_list)
-        )
+        send.assert_not_called()
         orders_handler.return_value.handle.assert_called_once()
         notifier.return_value.send_result_to_telegram.assert_called_once()
 
@@ -302,7 +300,7 @@ class TelegramTransportTests(unittest.TestCase):
         self.assertNotIn("private-smtp-password", text)
         self.assertNotIn("123:secret", text)
 
-    def test_info_is_sent_debug_is_not_and_transport_messages_are_filtered(self):
+    def test_only_errors_are_sent_and_transport_messages_are_filtered(self):
         handler = TelegramHandler("123:test", ["user"])
         handler.setLevel(logger_config["handlers"]["telegram_handler"]["level"])
         for spec in logger_config["handlers"]["telegram_handler"].get("filters", []):
@@ -315,9 +313,12 @@ class TelegramTransportTests(unittest.TestCase):
         ):
             logger.info("Заказ загружен")
             logger.debug("Технический запрос")
+            logger.warning("Повторная попытка")
+            logger.error("Ошибка отправки заказа")
+            logger.error("Telegram unavailable", extra={"console_only": True})
             logger.warning("Telegram unavailable", extra={"console_only": True})
         self.assertEqual(send.call_count, 1)
-        self.assertIn("Заказ загружен", send.call_args.args[1])
+        self.assertIn("Ошибка отправки заказа", send.call_args.args[1])
 
     def test_handler_splits_long_traceback_without_losing_text(self):
         handler = TelegramHandler("123:test", ["user"])
