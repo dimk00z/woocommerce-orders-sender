@@ -145,6 +145,54 @@ class OrderDiagnosticsTests(unittest.TestCase):
 
 
 class TelegramTransportTests(unittest.TestCase):
+    def test_telegram_omits_traceback_without_affecting_console_in_either_order(self):
+        from utils.log_context import RunContextFilter, register_log_secret, start_run
+        import sys
+
+        run_id = start_run()
+        register_log_secret("smtp-secret-for-test")
+        configurator = logging.config.DictConfigurator(logger_config)
+        formatters = {
+            name: configurator.configure_formatter(
+                deepcopy(
+                    logger_config["formatters"][
+                        logger_config["handlers"][name]["formatter"]
+                    ]
+                )
+            )
+            for name in ("telegram_handler", "console_stdout")
+        }
+        for order in (
+            ("telegram_handler", "console_stdout"),
+            ("console_stdout", "telegram_handler"),
+        ):
+            with self.subTest(order=order):
+                try:
+                    raise RuntimeError("SMTP disconnected smtp-secret-for-test")
+                except RuntimeError:
+                    record = logging.LogRecord(
+                        "test",
+                        logging.ERROR,
+                        __file__,
+                        1,
+                        "Заказ №123: этап авторизация",
+                        (),
+                        sys.exc_info(),
+                        sinfo="Stack (most recent call last): test stack",
+                    )
+                RunContextFilter().filter(record)
+                output = {name: formatters[name].format(record) for name in order}
+                telegram = output["telegram_handler"]
+                self.assertIn("Заказ №123: этап авторизация", telegram)
+                self.assertIn("SMTP disconnected", telegram)
+                self.assertIn(run_id, telegram)
+                self.assertNotIn("Traceback", telegram)
+                self.assertNotIn("Stack (most recent call last)", telegram)
+                self.assertNotIn("smtp-secret-for-test", telegram)
+                self.assertIn("Traceback", output["console_stdout"])
+                self.assertIn("test stack", output["console_stdout"])
+                self.assertIsNotNone(record.exc_info)
+
     def run_order_check(self, response, error=None):
         import main as app
 

@@ -11,6 +11,7 @@ from utils.log_context import (
     RunContextFilter,
     SafeFormatter,
     TelegramLogFilter,
+    TelegramFormatter,
     register_log_secret,
 )
 from utils.telegram_text import split_telegram_text
@@ -98,7 +99,12 @@ logger_config = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "std_formatter": {"()": SafeFormatter, "format": format_string, "style": "{"}
+        "std_formatter": {"()": SafeFormatter, "format": format_string, "style": "{"},
+        "telegram_formatter": {
+            "()": TelegramFormatter,
+            "format": format_string,
+            "style": "{",
+        },
     },
     "filters": {
         "run_context": {"()": RunContextFilter},
@@ -109,7 +115,7 @@ logger_config = {
             "()": TelegramHandler,
             "level": "ERROR",
             "filters": ["telegram_context"],
-            "formatter": "std_formatter",
+            "formatter": "telegram_formatter",
             "telegram_bot_token": telegram_params.bot_token,
             "telegram_users": telegram_params.users_id,
             "telegram_proxy": telegram_params.proxy,

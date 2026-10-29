@@ -3,6 +3,7 @@
 import logging
 import re
 from contextvars import ContextVar
+from copy import copy
 from uuid import uuid4
 
 _run_id = ContextVar("run_id", default="-")
@@ -44,3 +45,20 @@ class TelegramLogFilter(RunContextFilter):
 class SafeFormatter(logging.Formatter):
     def format(self, record):
         return redact(super().format(record))
+
+
+class TelegramFormatter(SafeFormatter):
+    """Keep the error reason, leaving traceback data intact for console handlers."""
+
+    def format(self, record):
+        record = copy(record)
+        if record.exc_info and record.exc_info[1] is not None:
+            error = record.exc_info[1]
+            message = record.getMessage()
+            if not str(error) or str(error) not in message:
+                record.msg = f"{message}: {type(error).__name__}: {error}"
+                record.args = ()
+        record.exc_info = None
+        record.exc_text = None
+        record.stack_info = None
+        return super().format(record)
