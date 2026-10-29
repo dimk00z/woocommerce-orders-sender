@@ -39,6 +39,41 @@ with (
 
 
 class EmailSendingTests(unittest.TestCase):
+    def test_real_order_template_sends_without_external_http_requests(self):
+        order = Order(
+            id="47090",
+            total=0,
+            email="buyer@example.com",
+            first_name="Проверка",
+            last_name="Шаблона",
+        )
+        handler = OrdersHandler(
+            orders=[order],
+            settings=SimpleNamespace(
+                email_settings=self.settings(),
+                woocommerce_settings=SimpleNamespace(
+                    user_key="key", secret_key="secret"
+                ),
+            ),
+            app_logger=Mock(),
+        )
+        with patch(
+            "requests.sessions.Session.request",
+            side_effect=AssertionError(
+                "HTML preparation must not fetch external resources"
+            ),
+        ) as request:
+            self.assertTrue(handler._send_order_email(order=order))
+        request.assert_not_called()
+        self.connection.sendmail.assert_called_once()
+        message = Parser(policy=policy.default).parsestr(
+            self.connection.sendmail.call_args.args[2]
+        )
+        html = next(
+            part for part in message.walk() if part.get_content_type() == "text/html"
+        )
+        self.assertIn("Проверка", html.get_content())
+
     def setUp(self):
         stack = ExitStack()
         self.addCleanup(stack.close)
