@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass
+from html import escape
 from http import HTTPStatus
 from smtplib import (
     SMTPException,
@@ -398,7 +399,11 @@ class OrdersHandler:
         Returns:
             str: _description_
         """
-        message_lines: List[str] = [f"Итог запуска {self.run_id}"]
+
+        def safe(value) -> str:
+            return escape(redact(str(value)), quote=False)
+
+        message_lines: List[str] = [f"Итог запуска {safe(self.run_id)}"]
         total: float = 0.0
         bad_orders = []
         for order in self.orders:
@@ -406,17 +411,22 @@ class OrdersHandler:
                 bad_orders.append(order)
             else:
                 products = "\n".join(
-                    [f" · {product.name}" for product in order.products]
+                    [f" · <b>{safe(product.name)}</b>" for product in order.products]
                 )
                 message_lines.append(
-                    f"№ {order.id} - {order.first_name} {order.last_name}, {order.email}\n{products}\n{order.total} руб."
+                    safe(
+                        f"№ {order.id} - {order.first_name} {order.last_name}, {order.email}"
+                    )
+                    + f"\n{products}\n<b>{safe(order.total)} руб.</b>"
                 )
                 total += order.total
             if not order.status:
-                message_lines.append(f"Ошибка заказа №{order.id} — {order.email}")
+                message_lines.append(safe(f"Ошибка заказа №{order.id} — {order.email}"))
             for result in self.email_results.get(order.id, []):
                 message_lines.append(
-                    f"Заказ №{order.id}, часть {result.part}/{result.total}: {result.details}"
+                    safe(
+                        f"Заказ №{order.id}, часть {result.part}/{result.total}: {result.details}"
+                    )
                 )
             status_result = (
                 "все письма приняты SMTP; статус WooCommerce подтверждён: completed"
@@ -425,16 +435,16 @@ class OrdersHandler:
                     order.id, "изменение статуса WooCommerce не запрашивалось"
                 )
             )
-            message_lines.append(f"Заказ №{order.id}: {status_result}")
+            message_lines.append(safe(f"Заказ №{order.id}: {status_result}"))
             if order.id in self.order_errors:
-                message_lines.append(redact(self.order_errors[order.id]))
+                message_lines.append(safe(self.order_errors[order.id]))
             elif not order.status and not self.email_results.get(order.id):
                 message_lines.append(
                     "Обработка не завершена; подробности в логах заказа"
                 )
         message_lines.append(
             f"Всего {len(self.orders)}, успешно {len(self.orders) - len(bad_orders)}, "
-            f"с ошибками {len(bad_orders)}. Сумма успешных заказов: {total} руб."
+            f"с ошибками {len(bad_orders)}.\n\n<b>Сумма успешных заказов: {total} руб.</b>"
         )
         return "\n".join(message_lines)
 

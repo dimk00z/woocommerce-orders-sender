@@ -400,6 +400,9 @@ class TelegramTransportTests(unittest.TestCase):
         )
         self.assertGreater(send.call_count, 1)
         self.assertTrue(
+            all(item.kwargs["parse_mode"] == "HTML" for item in send.call_args_list)
+        )
+        self.assertTrue(
             notifier.app_logger.info.call_args.kwargs["extra"]["console_only"]
         )
 

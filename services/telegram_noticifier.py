@@ -11,7 +11,7 @@ from urllib3.exceptions import MaxRetryError
 from services.proxy_loader import ProxyLoader
 from utils.config import TelegramSettrings
 from utils.log_context import redact, register_log_secret
-from utils.telegram_text import split_telegram_text
+from utils.telegram_text import split_telegram_html
 
 
 def format_telegram_send_error(ex: BaseException) -> str:
@@ -71,9 +71,11 @@ class TelegramNoticifier:
             for user_id in self.settings.users_id:
                 if not user_id:
                     continue
-                for index, part in enumerate(split_telegram_text(redact(message))):
+                for index, part in enumerate(split_telegram_html(redact(message))):
                     if (user_id, index) not in delivered:
-                        self.bot.send_message(chat_id=user_id, text=part)
+                        self.bot.send_message(
+                            chat_id=user_id, text=part, parse_mode="HTML"
+                        )
                         delivered.add((user_id, index))
             self.app_logger.info(
                 "Отчёт Telegram отправлен, подключение: %s",

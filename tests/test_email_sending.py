@@ -32,7 +32,7 @@ with (
     ),
     patch("pydantic.env_settings.read_env_file", return_value={}),
 ):
-    from models.order import Order
+    from models.order import Order, Product
     from services.orders_handler import OrdersHandler
     from services.woocommerce_fetcher import WoocommerceFetcher
     from utils.config import EmailSettings
@@ -178,6 +178,20 @@ class EmailSendingTests(unittest.TestCase):
 
 
 class OrderPipelineTests(unittest.TestCase):
+    def test_report_highlights_products_order_total_and_separate_grand_total(self):
+        order = self.order("47096")
+        order.status = True
+        order.total = 19900.0
+        order.first_name = "Ольга <Test>"
+        order.products = [Product(name="ELT <hardcore> & Community")]
+        report = self.handler([order])._create_result_message()
+        self.assertIn(" · <b>ELT &lt;hardcore&gt; &amp; Community</b>", report)
+        self.assertIn("\n<b>19900.0 руб.</b>", report)
+        self.assertIn("Ольга &lt;Test&gt;", report)
+        self.assertIn(
+            "с ошибками 0.\n\n<b>Сумма успешных заказов: 19900.0 руб.</b>", report
+        )
+
     def test_failed_send_does_not_update_woocommerce_and_report_says_so(self):
         order = self.order("104")
         handler = self.handler([order])
