@@ -201,9 +201,9 @@ class OrderPipelineTests(unittest.TestCase):
         for fields, expected in (
             (
                 {"payment_method": "bacs", "payment_method_title": "Банк <A> & B"},
-                "<b>Способ оплаты: Банк &lt;A&gt; &amp; B</b>",
+                "Способ оплаты: <b>Банк &lt;A&gt; &amp; B</b>",
             ),
-            ({"payment_method": "bacs"}, "<b>Способ оплаты: bacs</b>"),
+            ({"payment_method": "bacs"}, "Способ оплаты: <b>bacs</b>"),
             ({}, None),
             ({"payment_method": None, "payment_method_title": None}, None),
         ):
@@ -218,6 +218,18 @@ class OrderPipelineTests(unittest.TestCase):
                         self.assertIn(expected, report)
                     else:
                         self.assertNotIn("Способ оплаты:", report)
+
+    def test_prodamus_payment_adds_receipt_reminder(self):
+        for method in ("Карта (Продамус)", "ПРОДАМУС", "Банк"):
+            with self.subTest(method=method):
+                order = self.order("123")
+                order.payment_method_title = method
+                report = self.handler([order])._create_result_message()
+                reminder = "<b>------------\nИра, добавь чеки!!!\n-------------------\n</b>"
+                if "продамус" in method.casefold():
+                    self.assertIn(reminder, report)
+                else:
+                    self.assertNotIn("Ира, добавь чеки!!!", report)
 
     def test_report_highlights_products_order_total_and_separate_grand_total(self):
         order = self.order("47096")

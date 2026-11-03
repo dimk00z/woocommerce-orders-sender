@@ -424,7 +424,11 @@ class OrdersHandler:
                 message_lines.append(safe(f"Ошибка заказа №{order.id} — {order.email}"))
             payment_method = order.payment_method_title or order.payment_method
             if payment_method:
-                message_lines.append(f"<b>{safe(f'Способ оплаты: {payment_method}')}</b>")
+                message_lines.append(f"Способ оплаты: <b>{safe(payment_method)}</b>")
+                if "продамус" in payment_method.casefold():
+                    message_lines.append(
+                        "<b>------------\nИра, добавь чеки!!!\n-------------------\n</b>"
+                    )
             for result in self.email_results.get(order.id, []):
                 message_lines.append(
                     safe(
