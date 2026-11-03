@@ -225,7 +225,9 @@ class OrderPipelineTests(unittest.TestCase):
                 order = self.order("123")
                 order.payment_method_title = method
                 report = self.handler([order])._create_result_message()
-                reminder = "<b>------------\nИра, добавь чеки!!!\n-------------------\n</b>"
+                reminder = (
+                    "<b>------------\nИра, добавь чеки!!!\n-------------------\n</b>"
+                )
                 if "продамус" in method.casefold():
                     self.assertIn(reminder, report)
                 else:
@@ -248,9 +250,10 @@ class OrderPipelineTests(unittest.TestCase):
     def test_failed_send_does_not_update_woocommerce_and_report_says_so(self):
         order = self.order("104")
         handler = self.handler([order])
-        with patch.object(handler, "_send_order_email", return_value=False), patch(
-            "services.orders_handler.requests.Session"
-        ) as session:
+        with (
+            patch.object(handler, "_send_order_email", return_value=False),
+            patch("services.orders_handler.requests.Session") as session,
+        ):
             with self.assertLogs("test_orders", level="INFO"):
                 report = handler.handle(timeout=0)
         session.assert_not_called()
@@ -261,9 +264,10 @@ class OrderPipelineTests(unittest.TestCase):
         order = self.order("105")
         handler = self.handler([order])
         handler.settings.woocommerce_settings.url = "https://example.com"
-        with patch.object(handler, "_send_order_email", return_value=True), patch(
-            "services.orders_handler.requests.Session"
-        ) as session:
+        with (
+            patch.object(handler, "_send_order_email", return_value=True),
+            patch("services.orders_handler.requests.Session") as session,
+        ):
             session.return_value.put.return_value.status_code = 200
             with self.assertLogs("test_orders", level="INFO"):
                 report = handler.handle(timeout=0)

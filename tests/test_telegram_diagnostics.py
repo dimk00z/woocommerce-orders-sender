@@ -212,19 +212,16 @@ class TelegramTransportTests(unittest.TestCase):
             ),
             telegram_settings=SimpleNamespace(),
         )
-        with patch.object(app.logging.config, "dictConfig"), patch.object(
-            app, "app_logger", logger
-        ), patch.object(app, "get_settings", return_value=settings), patch.object(
-            app, "OrdersHandler"
-        ) as orders_handler, patch.object(
-            app, "TelegramNoticifier"
-        ) as notifier, patch(
-            "services.woocommerce_fetcher.requests.Session"
-        ) as session, patch.object(
-            handler, "_proxy_candidates", return_value=[""]
-        ) as proxies, patch.object(
-            handler.bot, "send_message"
-        ) as send:
+        with (
+            patch.object(app.logging.config, "dictConfig"),
+            patch.object(app, "app_logger", logger),
+            patch.object(app, "get_settings", return_value=settings),
+            patch.object(app, "OrdersHandler") as orders_handler,
+            patch.object(app, "TelegramNoticifier") as notifier,
+            patch("services.woocommerce_fetcher.requests.Session") as session,
+            patch.object(handler, "_proxy_candidates", return_value=[""]) as proxies,
+            patch.object(handler.bot, "send_message") as send,
+        ):
             session.return_value.get.return_value.json.return_value = response
             session.return_value.get.side_effect = error
             app.main()

@@ -365,9 +365,9 @@ class OrdersHandler:
             put_url = f"{self.settings.woocommerce_settings.url}/orders/{order.id}"
             session = requests.Session()
             session.headers = HEADERS
-            self.order_status_results[
-                order.id
-            ] = "изменение статуса WooCommerce запрошено, но результат не подтверждён"
+            self.order_status_results[order.id] = (
+                "изменение статуса WooCommerce запрошено, но результат не подтверждён"
+            )
             r = session.put(
                 put_url, auth=self.auth_pair, params={"status": "completed"}
             )
@@ -379,16 +379,16 @@ class OrdersHandler:
                 order.id,
                 r.status_code,
             )
-            self.order_errors[
-                order.id
-            ] = f"Письма приняты SMTP, изменение статуса WooCommerce не подтверждено: HTTP {r.status_code}"
+            self.order_errors[order.id] = (
+                f"Письма приняты SMTP, изменение статуса WooCommerce не подтверждено: HTTP {r.status_code}"
+            )
         except (
             requests.exceptions.ConnectionError,
             requests.exceptions.Timeout,
         ) as error:
-            self.order_errors[
-                order.id
-            ] = f"Письма приняты SMTP, ошибка изменения статуса: {type(error).__name__}: {error}"
+            self.order_errors[order.id] = (
+                f"Письма приняты SMTP, ошибка изменения статуса: {type(error).__name__}: {error}"
+            )
             self.app_logger.exception("Заказ №%s: ошибка изменения статуса", order.id)
 
         return False
