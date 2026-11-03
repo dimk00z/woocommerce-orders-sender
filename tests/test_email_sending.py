@@ -178,6 +178,47 @@ class EmailSendingTests(unittest.TestCase):
 
 
 class OrderPipelineTests(unittest.TestCase):
+    def test_payment_method_is_loaded_and_safely_displayed(self):
+        fetcher = WoocommerceFetcher(
+            woocommerce_settings=SimpleNamespace(
+                user_key="key",
+                secret_key="secret",
+                url="https://example.com",
+                redundant_phrase="",
+            ),
+            app_logger=Mock(),
+        )
+        base = {
+            "id": 123,
+            "total": "10",
+            "billing": {
+                "email": "buyer@example.com",
+                "first_name": "Test",
+                "last_name": "Buyer",
+            },
+            "line_items": [],
+        }
+        for fields, expected in (
+            (
+                {"payment_method": "bacs", "payment_method_title": "Банк <A> & B"},
+                "<b>Способ оплаты: Банк &lt;A&gt; &amp; B</b>",
+            ),
+            ({"payment_method": "bacs"}, "<b>Способ оплаты: bacs</b>"),
+            ({}, None),
+            ({"payment_method": None, "payment_method_title": None}, None),
+        ):
+            with self.subTest(fields=fields):
+                order = fetcher._parse_orders(
+                    wc_processing_orders=[dict(base, **fields)]
+                )[0]
+                for success in (True, False):
+                    order.status = success
+                    report = self.handler([order])._create_result_message()
+                    if expected:
+                        self.assertIn(expected, report)
+                    else:
+                        self.assertNotIn("Способ оплаты:", report)
+
     def test_report_highlights_products_order_total_and_separate_grand_total(self):
         order = self.order("47096")
         order.status = True

@@ -19,6 +19,8 @@ class Order(BaseModel):
     email: str
     first_name: str
     last_name: str
+    payment_method: str = ""
+    payment_method_title: str = ""
     total_files: List[ProductFile] = []
     status: bool = False
     products: List[Product] = []

@@ -59,6 +59,8 @@ class WoocommerceFetcher:
                 email=order_info["billing"]["email"],
                 first_name=order_info["billing"]["first_name"],
                 last_name=order_info["billing"]["last_name"],
+                payment_method=order_info.get("payment_method") or "",
+                payment_method_title=order_info.get("payment_method_title") or "",
             )
             total_files: Set[str] = set()
             for product in order_info["line_items"]:
